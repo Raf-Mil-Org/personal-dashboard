@@ -120,7 +120,16 @@ function confirm(event) {
         <div class="md:w-1/2">
             <div class="card">
                 <div class="font-semibold text-xl mb-4">Drawer</div>
-                <Drawer v-model:visible="visibleLeft" header="Drawer">
+                <Drawer
+                    v-model:visible="visibleLeft"
+                    header="Drawer"
+                    v-animateonscroll="{ enterClass: 'animate-fadein', leaveClass: 'animate-fadeout' }"
+                    :pt="{
+                        root: { style: { width: '100%' } },
+                        mask: { class: 'fade-transition' },
+                        content: { class: 'fade-transition' }
+                    }"
+                >
                     <p>
                         Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
                         consequat.
@@ -185,3 +194,25 @@ function confirm(event) {
         </div>
     </div>
 </template>
+
+<style>
+/* Fade effect applied to mask (background overlay) */
+.fade-transition {
+    transition: opacity 5s ease !important;
+}
+
+/* PrimeVue applies these classes during transitions */
+.p-component-overlay-enter-from,
+.p-component-overlay-leave-to,
+.p-drawer-enter-from,
+.p-drawer-leave-to {
+    opacity: 0;
+}
+
+.p-component-overlay-enter-to,
+.p-component-overlay-leave-from,
+.p-drawer-enter-to,
+.p-drawer-leave-from {
+    opacity: 1;
+}
+</style>

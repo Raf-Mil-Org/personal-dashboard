@@ -14,6 +14,27 @@ const router = createRouter({
                     component: () => import('@/views/Dashboard.vue')
                 },
                 {
+                    path: '/financial-dashboard',
+                    name: 'financial-dashboard',
+                    component: () => import('@/views/ExpensesDashboard.vue')
+                },
+                {
+                    path: '/visuals-dashboard',
+                    name: 'financial-dashboard',
+                    component: () => import('@/views/VisualsDashboard.vue')
+                },
+
+                {
+                    path: '/health-dashboard',
+                    name: 'health-dashboard',
+                    component: () => import('@/views/HealthDashboard.vue')
+                },
+                {
+                    path: '/financial-dashboard-claude',
+                    name: 'financial-dashboard-claude',
+                    component: () => import('@/views/ExpensesDashboardClaude.vue')
+                },
+                {
                     path: '/uikit/formlayout',
                     name: 'formlayout',
                     component: () => import('@/views/uikit/FormLayout.vue')
