@@ -21,18 +21,16 @@ const draw = (ctx, width, height, time) => {
 };
 
 onMounted(() => {
-    const ctx = canvas.value.getContext('2d');
-    canvas.value.width = 600;
-    canvas.value.height = 300;
-
-    let time = 20;
-    const animate = () => {
-        draw(ctx, canvas.value.width, canvas.value.height, time);
-        time -= speed.value;
-        requestAnimationFrame(animate);
-    };
-
-    animate();
+    // const ctx = canvas.value.getContext('2d');
+    // canvas.value.width = 600;
+    // canvas.value.height = 300;
+    // let time = 20;
+    // const animate = () => {
+    //     draw(ctx, canvas.value.width, canvas.value.height, time);
+    //     time -= speed.value;
+    //     requestAnimationFrame(animate);
+    // };
+    // animate();
 });
 
 watch([frequency, amplitude, speed], () => {
@@ -41,7 +39,7 @@ watch([frequency, amplitude, speed], () => {
 </script>
 
 <template>
-    <div class="p-6 text-center">
+    <!-- <div class="p-6 text-center">
         <h1 class="text-2xl font-bold mb-4">Visual Playground</h1>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div class="space-y-4">
@@ -62,6 +60,6 @@ watch([frequency, amplitude, speed], () => {
         <div class="flex">
             <canvas ref="canvas" class="border rounded-lg"></canvas>
         </div>
-    </div>
+    </div> -->
     <ParticlesComponent />
 </template>

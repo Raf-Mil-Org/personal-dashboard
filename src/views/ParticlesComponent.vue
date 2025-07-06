@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue';
 
-const particleCount = ref(15);
+const particleCount = ref(250);
 const speed = ref(2);
 const connectionDistance = ref(100);
 const canvas = ref(null);
@@ -53,6 +53,17 @@ const drawParticles = (ctx, particles) => {
     }
 };
 
+// Canvas View Mode
+const canvasClass = ref('w-full h-[400px]'); // Default Landscape
+
+const setLandscapeView = () => {
+    canvasClass.value = 'w-full h-[400px]'; // Wider Canvas
+};
+
+const setPortraitView = () => {
+    canvasClass.value = 'w-[400px] h-[600px]'; // Taller Canvas
+};
+
 onMounted(() => {
     const ctx = canvas.value.getContext('2d');
     canvas.value.width = 600;
@@ -76,7 +87,13 @@ onMounted(() => {
 <template>
     <div class="p-6 text-center">
         <h1 class="text-2xl font-bold mb-6">Advanced Visual Playground</h1>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- View Toggle Buttons -->
+        <div class="mb-4 flex justify-center gap-4">
+            <button @click="setLandscapeView" class="p-2 px-4 bg-blue-500 text-white rounded">Landscape View</button>
+            <button @click="setPortraitView" class="p-2 px-4 bg-green-500 text-white rounded">Portrait View</button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
             <div class="space-y-4">
                 <div>
                     <label for="particleCount">Particle Count: {{ particleCount }}</label>
@@ -91,7 +108,10 @@ onMounted(() => {
                     <input type="range" id="connectionDistance" min="50" max="200" v-model="connectionDistance" />
                 </div>
             </div>
-            <canvas ref="canvas" class="border rounded-lg"></canvas>
+            <!-- Canvas - Takes up more space -->
+            <div class="col-span-5 flex">
+                <canvas ref="canvas" :class="canvasClass" class="border rounded-lg"></canvas>
+            </div>
         </div>
     </div>
 </template>

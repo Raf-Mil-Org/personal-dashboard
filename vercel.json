@@ -1,9 +1,25 @@
 {
-    "rewrites": [
+    "version": 2,
+    "builds": [
         {
-            "source": "/:path*",
-            "destination": "/index.html"
+            "src": "package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "dist"
+            }
         }
     ],
-    "trailingSlash": false
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "/api/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/index.html"
+        }
+    ],
+    "env": {
+        "VITE_API_URL": "@health-tracker-api-url"
+    }
 }

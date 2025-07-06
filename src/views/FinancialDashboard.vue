@@ -2,6 +2,7 @@
 import { useLayout } from '@/layout/composables/layout';
 import { ProductService } from '@/service/ProductService';
 import { onMounted, ref, watch } from 'vue';
+// import StocksTable from './StocksTable.vue';
 
 const { getPrimary, getSurface, isDarkTheme } = useLayout();
 
@@ -268,6 +269,9 @@ const selectedCategories = ref(['']);
 </script>
 
 <template>
+    <div>
+        <!-- <StocksTable /> -->
+    </div>
     <div class="card flex justify-center">
         <!-- File input -->
         <input type="file" multiple @change="handleFileUpload" accept=".pdf,.csv" />

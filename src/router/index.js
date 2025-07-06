@@ -19,15 +19,60 @@ const router = createRouter({
                     component: () => import('@/views/ExpensesDashboard.vue')
                 },
                 {
-                    path: '/visuals-dashboard',
-                    name: 'financial-dashboard',
-                    component: () => import('@/views/VisualsDashboard.vue')
+                    path: '/financial-dashboard-2',
+                    name: 'financial-dashboard-2',
+                    component: () => import('@/views/FinancialDashboard2.vue')
                 },
 
+                {
+                    path: '/stocks-table',
+                    name: 'stocks-table',
+                    component: () => import('@/views/StocksTable.vue')
+                },
+                {
+                    path: '/visuals-dashboard',
+                    name: 'visuals-dashboard',
+                    component: () => import('@/views/VisualsDashboard.vue')
+                },
+                {
+                    path: '/journal-dashboard',
+                    name: 'journal-dashboard',
+                    component: () => import('@/views/JournalDashboard.vue')
+                },
+                // {
+                //     path: '/thoughts',
+                //     name: 'thoughts',
+                //     component: () => import('@/views/Thoughts.vue')
+                // },
+                {
+                    path: '/thought-tracker',
+                    name: 'thought-tracker',
+                    component: () => import('@/views/ThoughtTracker.vue')
+                },
+                {
+                    path: '/photo-uploader',
+                    name: 'photo-uploader',
+                    component: () => import('@/views/PhotoUploader.vue')
+                },
                 {
                     path: '/health-dashboard',
                     name: 'health-dashboard',
                     component: () => import('@/views/HealthDashboard.vue')
+                },
+                // {
+                //     path: '/customers-overview',
+                //     name: 'customers-overview',
+                //     component: () => import('@/views/CustomersOverview.vue')
+                // },
+                {
+                    path: '/task-planner',
+                    name: 'task-planner',
+                    component: () => import('@/views/TaskPlanner.vue')
+                },
+                {
+                    path: '/task-planner-2',
+                    name: 'task-planner-2',
+                    component: () => import('@/views/TaskPlanner2.vue')
                 },
                 {
                     path: '/financial-dashboard-claude',
@@ -139,7 +184,7 @@ const router = createRouter({
         },
 
         {
-            path: '/auth/login',
+            path: '/login',
             name: 'login',
             component: () => import('@/views/pages/auth/Login.vue')
         },
