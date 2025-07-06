@@ -1,7 +1,6 @@
 <script setup>
 import useHealthStore from '@/composables/useHealthStore';
 import Button from 'primevue/button';
-import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
 import InputNumber from 'primevue/inputnumber';
@@ -20,6 +19,7 @@ const showAddMedicationDialog = ref(false);
 const showToiletDialog = ref(false);
 const showToiletDetailsDialog = ref(false);
 const showWorkoutDialog = ref(false);
+const isEditMode = ref(false);
 const newSupplement = ref('');
 const newMedication = ref('');
 const customWater = ref(0);
@@ -236,20 +236,20 @@ function submitWorkout() {
 }
 
 function isSupplementTaken(supplement) {
-    return (data.supplements_taken || []).includes(supplement);
+    const taken = (data.value.supplements_taken || []).includes(supplement);
+    console.log('isSupplementTaken:', supplement, '=', taken);
+    return taken;
 }
 
 function handleSupplementToggle(supplement, checked) {
+    console.log('Toggling supplement:', supplement, 'to:', checked);
+    console.log('Current supplements_taken:', data.value.supplements_taken);
     toggleSupplement(supplement, checked);
+    console.log('After toggle supplements_taken:', data.value.supplements_taken);
 }
 
 function removeSupplement(supplement) {
     removeSupplementFromList(supplement);
-}
-
-function clearAllSupplements() {
-    data.value.supplements_taken = [];
-    save();
 }
 
 onMounted(async () => {
@@ -370,33 +370,30 @@ onMounted(async () => {
                     <span class="text-2xl">💊</span>
                     Vitamins & Supplements
                 </h2>
-                <Button label="Add New" @click="showAddSupplementDialog = true" size="small" />
+                <div class="flex gap-2">
+                    <Button :label="isEditMode ? 'Done' : 'Edit List'" @click="isEditMode = !isEditMode" :severity="isEditMode ? 'success' : 'secondary'" size="small" />
+                    <Button label="Add New" @click="showAddSupplementDialog = true" size="small" />
+                </div>
             </div>
 
-            <!-- Supplements List -->
-            <div class="space-y-3">
-                <div v-for="supplement in data.supplements_list || []" :key="supplement" class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                    <div class="flex items-center gap-3">
-                        <Checkbox :modelValue="isSupplementTaken(supplement)" @update:modelValue="(checked) => handleSupplementToggle(supplement, checked)" :inputId="supplement" />
-                        <label :for="supplement" class="text-sm font-medium cursor-pointer">{{ supplement }}</label>
+            <!-- Supplements Grid -->
+            <div class="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2">
+                <div
+                    v-for="supplement in data.supplements_list || []"
+                    :key="supplement"
+                    @click="isEditMode ? removeSupplement(supplement) : handleSupplementToggle(supplement, !isSupplementTaken(supplement))"
+                    class="px-4 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm h-16 flex items-center justify-center"
+                    :class="isEditMode ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' : isSupplementTaken(supplement) ? 'bg-green-500 border-green-600 text-white shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'"
+                >
+                    <div class="text-center px-4">
+                        <div class="font-medium leading-tigh px-4">
+                            {{ supplement }}
+                            <span v-if="isEditMode" class="block text-red-500 mt-0.5">Remove</span>
+                        </div>
                     </div>
-                    <Button icon="pi pi-trash" @click="removeSupplement(supplement)" size="small" severity="danger" text aria-label="Remove supplement" />
                 </div>
 
-                <div v-if="(data.supplements_list || []).length === 0" class="text-center py-4 text-gray-500">No supplements added yet. Click "Add New" to get started.</div>
-            </div>
-
-            <!-- Taken Today Summary -->
-            <div v-if="(data.supplements_taken || []).length > 0" class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-medium text-green-800">Taken Today:</h3>
-                    <Button label="Clear All" @click="clearAllSupplements" size="small" severity="secondary" text />
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <span v-for="supplement in data.supplements_taken || []" :key="supplement" class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                        {{ supplement }}
-                    </span>
-                </div>
+                <div v-if="(data.supplements_list || []).length === 0" class="col-span-full text-center py-8 text-gray-500">No supplements added yet. Click "Add New" to get started.</div>
             </div>
         </div>
 
