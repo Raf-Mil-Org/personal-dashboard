@@ -1,17 +1,50 @@
 <script setup>
-import useHealthStore from '@/composables/useHealthStore';
+import { useHealthStore } from '@/composables/useHealthStore';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
 import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import ProgressBar from 'primevue/progressbar';
-import Slider from 'primevue/slider';
 import Textarea from 'primevue/textarea';
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 
-const { data, load, save, addWaterIntake, logToilet, updateToiletLog, addSupplement, toggleSupplement, removeSupplementFromList, addMedication, addMedicationToList, logWorkout, selectedDate, goToPreviousDay, goToNextDay, goToToday } =
-    useHealthStore();
+const {
+    healthData,
+    selectedDate,
+    isLoading,
+    error,
+    commonSupplements,
+    commonMedications,
+    addWater,
+    removeWater,
+    addToiletLog,
+    removeToiletLog,
+    updateToiletLog,
+    addVitamin,
+    removeVitamin,
+    toggleVitamin,
+    addMedication,
+    removeMedication,
+    toggleMedication,
+    addWorkout,
+    removeWorkout,
+    updateSleep,
+    updateMood,
+    updateNotes,
+    addSupplement,
+    removeSupplement,
+    toggleSupplement,
+    goToPreviousDay,
+    goToNextDay,
+    goToToday,
+    initialize,
+    waterProgress,
+    sleepProgress,
+    isToday,
+    formattedDate,
+    saveHealthData
+} = useHealthStore();
 
 // UI State
 const showAddSupplementDialog = ref(false);
@@ -136,22 +169,6 @@ const sleepQuality = [
     { label: '😍 Excellent (5)', value: 5 }
 ];
 
-// Date navigation - using selectedDate from health store
-
-// Computed properties for date display
-const formattedDate = computed(() => {
-    return new Date(selectedDate.value).toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-});
-
-const isToday = computed(() => {
-    return selectedDate.value === new Date().toISOString().slice(0, 10);
-});
-
 // Date navigation functions - using functions from health store
 
 // Functions
@@ -166,14 +183,14 @@ function addSupplementToList() {
 
 function addNewMedicationToList() {
     if (newMedication.value.trim()) {
-        addMedicationToList(newMedication.value.trim());
+        addMedication(newMedication.value.trim());
         newMedication.value = '';
         showAddMedicationDialog.value = false;
     }
 }
 
 function submitToiletLog() {
-    logToilet(toiletForm.value.type, {
+    addToiletLog(toiletForm.value.type, {
         consistency: toiletForm.value.consistency,
         color: toiletForm.value.color,
         notes: toiletForm.value.notes
@@ -218,44 +235,44 @@ function updateToiletEntry() {
 }
 
 function deleteToiletEntry(entryId) {
-    const logs = data.value.toilet_logs || [];
+    const logs = healthData.value.toiletLogs || [];
     const index = logs.findIndex((entry) => entry && entry.id === entryId);
     if (index !== -1) {
         logs.splice(index, 1);
-        data.value.toilet_logs = logs;
-        save();
+        healthData.value.toiletLogs = logs;
+        saveHealthData(selectedDate.value);
     }
     showToiletDetailsDialog.value = false;
     selectedToiletEntry.value = null;
 }
 
 function submitWorkout() {
-    logWorkout(workoutForm.value);
+    addWorkout(workoutForm.value);
     workoutForm.value = { type: '', duration: 0, intensity: 'medium', notes: '' };
     showWorkoutDialog.value = false;
 }
 
 function isSupplementTaken(supplement) {
-    const taken = (data.value.supplements_taken || []).includes(supplement);
+    const taken = (healthData.value.supplements || []).includes(supplement);
     console.log('isSupplementTaken:', supplement, '=', taken);
     return taken;
 }
 
 function handleSupplementToggle(supplement, checked) {
     console.log('Toggling supplement:', supplement, 'to:', checked);
-    console.log('Current supplements_taken:', data.value.supplements_taken);
-    toggleSupplement(supplement, checked);
-    console.log('After toggle supplements_taken:', data.value.supplements_taken);
+    console.log('Current supplements:', healthData.value.supplements);
+    toggleSupplement(supplement);
+    console.log('After toggle supplements:', healthData.value.supplements);
 }
 
-function removeSupplement(supplement) {
-    removeSupplementFromList(supplement);
+function removeSupplementFromList(supplement) {
+    removeSupplement(supplement);
 }
 
 onMounted(async () => {
     try {
         // Initialize the health store
-        await load();
+        await initialize();
     } catch (err) {
         console.error('Error initializing health dashboard:', err);
     }
@@ -264,6 +281,16 @@ onMounted(async () => {
 
 <template>
     <div class="p-6 space-y-8 max-w-4xl mx-auto">
+        <!-- Loading State -->
+        <div v-if="isLoading" class="text-center py-8">
+            <div class="text-lg text-gray-600">Loading health data...</div>
+        </div>
+
+        <!-- Error State -->
+        <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div class="text-red-800">Error: {{ error }}</div>
+        </div>
+
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-800 mb-2">💪 Health Tracker</h1>
 
@@ -291,19 +318,25 @@ onMounted(async () => {
             <div class="space-y-4">
                 <div class="flex items-center justify-between">
                     <div class="text-sm text-gray-600">
-                        {{ data.water_intake.ml }}ml / {{ data.water_intake.goal_ml }}ml
-                        <span class="text-xs">({{ data.water_intake.glasses }} glasses)</span>
+                        {{ healthData.waterIntake }} glasses / 8 glasses
+                        <span class="text-xs">({{ healthData.waterIntake * 250 }}ml)</span>
                     </div>
-                    <div class="text-sm font-medium text-blue-600">{{ Math.round((data.water_intake.ml / data.water_intake.goal_ml) * 100) }}%</div>
+                    <div class="text-sm font-medium text-blue-600">{{ Math.round(waterProgress) }}%</div>
                 </div>
-                <ProgressBar :value="(data.water_intake.ml / data.water_intake.goal_ml) * 100" class="h-3" />
+                <ProgressBar :value="waterProgress" class="h-3" />
                 <div class="flex gap-2 flex-wrap">
-                    <Button label="+250ml" @click="addWaterIntake(250)" size="small" />
-                    <Button label="+500ml" @click="addWaterIntake(500)" size="small" />
-                    <Button label="+1L" @click="addWaterIntake(1000)" size="small" />
+                    <Button label="+1 Glass" @click="addWater" size="small" />
+                    <Button label="-1 Glass" @click="removeWater" size="small" severity="secondary" />
                     <div class="flex items-center gap-2">
-                        <InputNumber v-model="customWater" placeholder="Custom ml" :min="0" :max="5000" class="w-24" />
-                        <Button label="Add" @click="addWaterIntake(customWater)" size="small" />
+                        <InputNumber v-model="customWater" placeholder="Glasses" :min="0" :max="20" class="w-24" />
+                        <Button
+                            label="Set"
+                            @click="
+                                healthData.waterIntake = customWater;
+                                saveHealthData(selectedDate);
+                            "
+                            size="small"
+                        />
                     </div>
                 </div>
             </div>
@@ -316,13 +349,13 @@ onMounted(async () => {
                 Toilet Log
             </h2>
             <div class="flex gap-4 mb-4">
-                <Button label="💦 Pee" @click="logToilet('pee')" severity="info" />
-                <Button label="💩 Poop" @click="logToilet('poop')" severity="warning" />
+                <Button label="💦 Pee" @click="addToiletLog('pee')" severity="info" />
+                <Button label="💩 Poop" @click="addToiletLog('poop')" severity="warning" />
                 <Button label="Detailed Log" @click="showToiletDialog = true" severity="secondary" />
             </div>
 
-            <div v-if="(data.toilet_logs || []).length > 0" class="space-y-2">
-                <div v-for="entry in (data.toilet_logs || []).slice(-5)" :key="entry.id" class="p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
+            <div v-if="(healthData.toiletLogs || []).length > 0" class="space-y-2">
+                <div v-for="(entry, index) in (healthData.toiletLogs || []).slice(-5)" :key="index" class="p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
                     <div class="flex items-start justify-between mb-2">
                         <div class="flex items-center gap-3">
                             <span class="text-lg">{{ entry.type === 'pee' ? '💦' : '💩' }}</span>
@@ -379,21 +412,27 @@ onMounted(async () => {
             <!-- Supplements Grid -->
             <div class="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2">
                 <div
-                    v-for="supplement in data.supplements_list || []"
+                    v-for="supplement in commonSupplements"
                     :key="supplement"
-                    @click="isEditMode ? removeSupplement(supplement) : handleSupplementToggle(supplement, !isSupplementTaken(supplement))"
-                    class="px-4 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm h-16 flex items-center justify-center"
-                    :class="isEditMode ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100' : isSupplementTaken(supplement) ? 'bg-green-500 border-green-600 text-white shadow-sm' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'"
+                    @click="isEditMode ? removeSupplement(supplement) : toggleSupplement(supplement)"
+                    class="px-3 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm h-16 flex items-center justify-center"
+                    :class="
+                        isEditMode
+                            ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                            : healthData.supplements.includes(supplement)
+                              ? 'bg-green-500 border-green-600 text-white shadow-sm'
+                              : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                    "
                 >
-                    <div class="text-center px-4">
-                        <div class="font-medium leading-tigh px-4">
+                    <div class="text-center">
+                        <div class="font-medium leading-tight">
                             {{ supplement }}
                             <span v-if="isEditMode" class="block text-red-500 mt-0.5">Remove</span>
                         </div>
                     </div>
                 </div>
 
-                <div v-if="(data.supplements_list || []).length === 0" class="col-span-full text-center py-8 text-gray-500">No supplements added yet. Click "Add New" to get started.</div>
+                <div v-if="commonSupplements.length === 0" class="col-span-full text-center py-8 text-gray-500">No supplements added yet. Click "Add New" to get started.</div>
             </div>
         </div>
 
@@ -407,11 +446,11 @@ onMounted(async () => {
                 <Button label="Add New" @click="showAddMedicationDialog = true" size="small" />
             </div>
             <div class="space-y-3">
-                <div v-for="med in data.medications_list || []" :key="med" class="flex items-center justify-between p-3 border rounded-lg">
+                <div v-for="med in commonMedications" :key="med" class="flex items-center justify-between p-3 border rounded-lg">
                     <span class="font-medium">{{ med }}</span>
                     <div class="flex items-center gap-2">
                         <InputText v-model="medTime" placeholder="Time" class="w-20 text-sm" />
-                        <Button label="Take" @click="addMedication(med, medTime)" size="small" />
+                        <Button label="Take" @click="addMedication(med)" size="small" />
                     </div>
                 </div>
             </div>
@@ -426,15 +465,15 @@ onMounted(async () => {
             <div class="grid md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium mb-2">Hours Slept</label>
-                    <InputNumber v-model="data.sleep.hours" :min="0" :max="24" :step="0.5" class="w-full" />
+                    <InputNumber v-model="healthData.sleep.hours" :min="0" :max="24" :step="0.5" class="w-full" @update:modelValue="updateSleep({ hours: $event })" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-2">Sleep Quality</label>
-                    <Dropdown v-model="data.sleep.quality" :options="sleepQuality" optionLabel="label" optionValue="value" placeholder="Select quality" class="w-full" />
+                    <Dropdown v-model="healthData.sleep.quality" :options="sleepQuality" optionLabel="label" optionValue="value" placeholder="Select quality" class="w-full" @update:modelValue="updateSleep({ quality: $event })" />
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium mb-2">Notes (dreams, disturbances)</label>
-                    <Textarea v-model="data.sleep.notes" rows="2" placeholder="How did you sleep? Any dreams or issues?" class="w-full" />
+                    <Textarea v-model="healthData.sleep.notes" rows="2" placeholder="How did you sleep? Any dreams or issues?" class="w-full" @update:modelValue="updateSleep({ notes: $event })" />
                 </div>
             </div>
         </div>
@@ -449,8 +488,8 @@ onMounted(async () => {
                 <Button label="Log Workout" @click="showWorkoutDialog = true" />
             </div>
 
-            <div v-if="(data.workouts || []).length > 0" class="space-y-3">
-                <div v-for="workout in (data.workouts || []).slice(-3)" :key="workout.id" class="p-4 border rounded-lg bg-gray-50">
+            <div v-if="(healthData.workouts || []).length > 0" class="space-y-3">
+                <div v-for="(workout, index) in (healthData.workouts || []).slice(-3)" :key="index" class="p-4 border rounded-lg bg-gray-50">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="font-medium">{{ workout.type }}</div>
@@ -472,15 +511,11 @@ onMounted(async () => {
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-2">Current Mood</label>
-                    <Dropdown v-model="data.mood.current" :options="moodOptions" optionLabel="label" optionValue="value" placeholder="How are you feeling?" class="w-full" />
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-2">Energy Level: {{ data.mood.energy_level }}/10</label>
-                    <Slider v-model="data.mood.energy_level" :min="1" :max="10" :step="1" class="w-full" />
+                    <Dropdown v-model="healthData.mood" :options="moodOptions" optionLabel="label" optionValue="value" placeholder="How are you feeling?" class="w-full" @update:modelValue="updateMood($event)" />
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-2">Notes (context/reason)</label>
-                    <Textarea v-model="data.mood.notes" rows="2" placeholder="What's affecting your mood today?" class="w-full" />
+                    <Textarea v-model="healthData.notes" rows="2" placeholder="What's affecting your mood today?" class="w-full" @update:modelValue="updateNotes($event)" />
                 </div>
             </div>
         </div>

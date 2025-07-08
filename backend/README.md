@@ -1,186 +1,170 @@
-# Health Tracker Backend API
+# Health Dashboard Backend
 
-A Node.js/Express backend for the personal health tracking application with MongoDB database and JWT authentication.
+A simple Node.js + Express.js backend with MongoDB for the Health Dashboard application.
 
-## Features
-
--   **User Authentication**: Register, login, and profile management
--   **Health Data Management**: CRUD operations for daily health entries
--   **Data Analytics**: Statistics and date range queries
--   **Security**: JWT tokens, password hashing, rate limiting
--   **Scalable**: MongoDB with proper indexing
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
 -   Node.js (v16 or higher)
--   MongoDB (local or Atlas)
--   npm or yarn
+-   MongoDB (running locally or cloud instance)
 
 ### Installation
 
-1. **Clone and install dependencies:**
+1. **Install dependencies:**
 
     ```bash
     cd backend
     npm install
     ```
 
-2. **Set up environment variables:**
+2. **Set up MongoDB:**
+
+    - **Local MongoDB:** Make sure MongoDB is running on your machine
+    - **MongoDB Atlas:** Update `config.env` with your connection string
+
+3. **Configure environment:**
 
     ```bash
-    cp env.example .env
-    # Edit .env with your configuration
+    # Edit config.env file
+    PORT=3001
+    MONGODB_URI=mongodb://localhost:27017/health-dashboard
+    CORS_ORIGIN=http://localhost:5174
     ```
 
-3. **Start MongoDB:**
+4. **Start the server:**
 
     ```bash
-    # Local MongoDB
-    mongod
-
-    # Or use MongoDB Atlas (update MONGODB_URI in .env)
-    ```
-
-4. **Run the server:**
-
-    ```bash
-    # Development
+    # Development mode (with auto-restart)
     npm run dev
 
-    # Production
+    # Production mode
     npm start
     ```
 
-## API Endpoints
-
-### Authentication
-
--   `POST /api/auth/register` - Register new user
--   `POST /api/auth/login` - Login user
--   `GET /api/auth/me` - Get current user profile
--   `PUT /api/auth/me` - Update user profile
--   `PUT /api/auth/password` - Change password
+## 📊 API Endpoints
 
 ### Health Data
 
--   `GET /api/health/:date` - Get health entry for specific date
--   `POST /api/health` - Create/update health entry
--   `GET /api/health/range/:startDate/:endDate` - Get entries for date range
--   `GET /api/health/stats/:startDate/:endDate` - Get statistics
--   `DELETE /api/health/:date` - Delete health entry
+-   `GET /api/health/:date` - Get health data for specific date
+-   `PUT /api/health/:date` - Update health data for specific date
+-   `GET /api/health` - Get all health data (with pagination)
+-   `DELETE /api/health/:date` - Delete health data for specific date
+-   `GET /api/health/stats/date-range` - Get date range statistics
 
-## Environment Variables
+### Status
 
-| Variable       | Description               | Default                        |
-| -------------- | ------------------------- | ------------------------------ |
-| `PORT`         | Server port               | 8000                           |
-| `NODE_ENV`     | Environment               | development                    |
-| `MONGODB_URI`  | MongoDB connection string | localhost:27017/health-tracker |
-| `JWT_SECRET`   | JWT signing secret        | your-secret-key                |
-| `FRONTEND_URL` | Frontend URL for CORS     | http://localhost:3000          |
+-   `GET /api/status` - Health check endpoint
 
-## Deployment Options
+## 🗄️ Database Schema
 
-### 1. Railway (Recommended - Free)
+The `HealthData` model includes:
 
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
+-   **Date tracking** (YYYY-MM-DD format)
+-   **Water intake** (number of glasses)
+-   **Vitamins & Supplements** (array of strings)
+-   **Medications** (array of strings)
+-   **Toilet logs** (pee/poop with details)
+-   **Sleep data** (hours, quality, notes)
+-   **Workouts** (type, duration, intensity, notes)
+-   **Mood tracking** (terrible to excellent)
+-   **General notes**
 
-# Login and deploy
-railway login
-railway init
-railway up
-```
+## 🔧 Development
+
+### Local MongoDB Setup
+
+1. **Install MongoDB Community Edition:**
+
+    ```bash
+    # macOS (using Homebrew)
+    brew tap mongodb/brew
+    brew install mongodb-community
+
+    # Start MongoDB service
+    brew services start mongodb/brew/mongodb-community
+    ```
+
+2. **Verify MongoDB is running:**
+
+    ```bash
+    mongosh
+    # or
+    mongo
+    ```
+
+3. **Create database:**
+    ```bash
+    use health-dashboard
+    ```
+
+### Environment Variables
+
+| Variable      | Description               | Default                                    |
+| ------------- | ------------------------- | ------------------------------------------ |
+| `PORT`        | Server port               | 3001                                       |
+| `NODE_ENV`    | Environment               | development                                |
+| `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/health-dashboard |
+| `CORS_ORIGIN` | Frontend URL for CORS     | http://localhost:5174                      |
+
+## 🚀 Deployment Options
+
+### 1. Railway (Recommended)
+
+-   Free tier available
+-   Easy MongoDB integration
+-   Automatic deployments
 
 ### 2. Render
 
--   Connect your GitHub repo
--   Set environment variables
--   Deploy automatically
+-   Free tier available
+-   Built-in MongoDB support
+-   Simple deployment process
 
-### 3. Heroku
+### 3. Vercel
 
-```bash
-# Install Heroku CLI
-heroku create your-health-tracker
-heroku config:set NODE_ENV=production
-heroku config:set MONGODB_URI=your-mongodb-atlas-uri
-heroku config:set JWT_SECRET=your-secret-key
-git push heroku main
+-   Free tier available
+-   Great for frontend + API
+-   Serverless functions
+
+### 4. Heroku
+
+-   Free tier discontinued
+-   Easy deployment
+-   Add-on for MongoDB
+
+## 📝 Example API Usage
+
+```javascript
+// Get today's health data
+fetch('http://localhost:3001/api/health/2024-01-15')
+    .then((res) => res.json())
+    .then((data) => console.log(data));
+
+// Update water intake
+fetch('http://localhost:3001/api/health/2024-01-15', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ waterIntake: 8 })
+})
+    .then((res) => res.json())
+    .then((data) => console.log(data));
 ```
 
-### 4. DigitalOcean App Platform
+## 🔍 Troubleshooting
 
--   Connect GitHub repository
--   Set environment variables
--   Automatic deployments
+### MongoDB Connection Issues
 
-## Database Setup
+-   Ensure MongoDB is running: `brew services list | grep mongodb`
+-   Check connection string in `config.env`
+-   Verify database exists: `mongosh --eval "use health-dashboard"`
 
-### MongoDB Atlas (Recommended for production)
+### CORS Issues
 
-1. Create account at [MongoDB Atlas](https://www.mongodb.com/atlas)
-2. Create new cluster
-3. Get connection string
-4. Update `MONGODB_URI` in environment variables
+-   Update `CORS_ORIGIN` in `config.env` to match your frontend URL
+-   Ensure frontend is running on the correct port
 
-### Local MongoDB
+### Port Conflicts
 
-```bash
-# Install MongoDB
-brew install mongodb-community  # macOS
-sudo apt install mongodb       # Ubuntu
-
-# Start MongoDB
-mongod
-```
-
-## Security Features
-
--   **JWT Authentication**: Secure token-based auth
--   **Password Hashing**: bcrypt for password security
--   **Rate Limiting**: Prevent abuse
--   **CORS Protection**: Configured for frontend
--   **Input Validation**: Express-validator middleware
--   **Helmet**: Security headers
-
-## Development
-
-### Running Tests
-
-```bash
-npm test
-```
-
-### API Testing
-
-Use tools like Postman or curl:
-
-```bash
-# Test health endpoint
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     http://localhost:8000/api/health/2024-01-15
-```
-
-## Production Checklist
-
--   [ ] Set `NODE_ENV=production`
--   [ ] Use strong `JWT_SECRET`
--   [ ] Configure MongoDB Atlas
--   [ ] Set up proper CORS origins
--   [ ] Enable rate limiting
--   [ ] Set up monitoring/logging
--   [ ] Configure SSL/HTTPS
--   [ ] Set up backups
-
-## Support
-
-For issues and questions:
-
-1. Check the logs
-2. Verify environment variables
-3. Test database connection
-4. Check API endpoints with Postman
+-   Change `PORT` in `config.env` if 3001 is already in use
+-   Update frontend API calls accordingly
