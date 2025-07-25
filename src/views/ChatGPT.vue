@@ -26,7 +26,7 @@ async function sendMessage() {
             },
             {
                 headers: {
-                    Authorization: `Bearer `,
+                    Authorization: '',
                     'Content-Type': 'application/json'
                 }
             }
