@@ -58,6 +58,7 @@ const newMedication = ref('');
 const customWater = ref(0);
 const medTime = ref('');
 const selectedToiletEntry = ref(null);
+const isEditModeMed = ref(false);
 
 // Form data for dialogs
 const toiletForm = ref({
@@ -280,37 +281,9 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="p-6 space-y-8 max-w-4xl mx-auto">
-        <!-- Loading State -->
-        <div v-if="isLoading" class="text-center py-8">
-            <div class="text-lg text-gray-600">Loading health data...</div>
-        </div>
-
-        <!-- Error State -->
-        <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <div class="text-red-800">Error: {{ error }}</div>
-        </div>
-
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">💪 Health Tracker</h1>
-
-            <!-- Date Navigation -->
-            <div class="flex items-center justify-center gap-4 mb-4">
-                <Button icon="pi pi-chevron-left" @click="goToPreviousDay" severity="secondary" size="small" aria-label="Previous day" />
-                <div class="flex items-center gap-2">
-                    <span class="text-lg font-medium text-gray-800">{{ formattedDate }}</span>
-                    <Button v-if="!isToday" label="Today" @click="goToToday" size="small" severity="info" />
-                </div>
-                <Button icon="pi pi-chevron-right" @click="goToNextDay" severity="secondary" size="small" aria-label="Next day" />
-            </div>
-
-            <p class="text-gray-600">
-                {{ isToday ? "Today's Health Data" : 'Historical Health Data' }}
-            </p>
-        </div>
-
-        <!-- Water Intake Tracker -->
-        <div class="bg-white rounded-lg shadow-md p-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+        <!-- <div class="col-span-12 xl:col-span-6"> -->
+        <div class="card">
             <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
                 <span class="text-2xl">💧</span>
                 Water Intake
@@ -327,7 +300,7 @@ onMounted(async () => {
                 <div class="flex gap-2 flex-wrap">
                     <Button label="+1 Glass" @click="addWater" size="small" />
                     <Button label="-1 Glass" @click="removeWater" size="small" severity="secondary" />
-                    <div class="flex items-center gap-2">
+                    <!-- <div class="flex items-center gap-2">
                         <InputNumber v-model="customWater" placeholder="Glasses" :min="0" :max="20" class="w-24" />
                         <Button
                             label="Set"
@@ -337,13 +310,88 @@ onMounted(async () => {
                             "
                             size="small"
                         />
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </div>
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold flex items-center gap-2">
+                    <span class="text-2xl">💊</span>
+                    Vitamins & Supplements
+                </h2>
+                <div class="flex gap-2">
+                    <Button :icon="isEditMode ? 'pi pi-check' : 'pi pi-pencil'" @click="isEditMode = !isEditMode" :severity="isEditMode ? 'success' : 'secondary'" size="small" />
+                    <Button icon="pi pi-plus" @click="showAddSupplementDialog = true" size="small" />
+                </div>
+            </div>
 
-        <!-- Toilet Log -->
-        <div class="bg-white rounded-lg shadow-md p-6">
+            <!-- Supplements Grid -->
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(50px,1fr))] gap-2">
+                <div
+                    v-for="supplement in commonSupplements"
+                    :key="supplement"
+                    @click="isEditMode ? removeSupplement(supplement) : toggleSupplement(supplement)"
+                    class="px-3 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm flex items-center justify-center"
+                    :class="
+                        isEditMode
+                            ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                            : healthData.supplements.includes(supplement)
+                              ? 'bg-green-500 border-green-600 text-white shadow-sm'
+                              : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                    "
+                >
+                    <div class="text-center">
+                        <div class="font-medium leading-tight">
+                            {{ supplement }}
+                            <!-- <span v-if="isEditMode" class="block text-red-500 mt-0.5">Remove</span> -->
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="commonSupplements.length === 0" class="col-span-full text-center py-8 text-gray-500">No supplements added yet. Click "Add New" to get started.</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold flex items-center gap-2">
+                    <span class="text-2xl">💉</span>
+                    Medication
+                </h2>
+                <div class="flex gap-2">
+                    <Button :icon="isEditMode ? 'pi pi-check' : 'pi pi-pencil'" @click="isEditModeMed = !isEditModeMed" :severity="isEditModeMed ? 'success' : 'secondary'" size="small" />
+                    <Button icon="pi pi-plus" @click="showAddMedicationDialog = true" size="small" />
+                </div>
+            </div>
+            <!-- Medications Grid -->
+            <!-- <div class="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2"> -->
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-2">
+                <div
+                    v-for="medication in commonMedications"
+                    :key="medication"
+                    @click="isEditModeMed ? removeMedication(medication) : toggleMedication(medication)"
+                    class="px-3 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm flex items-center justify-center"
+                    :class="
+                        isEditModeMed
+                            ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                            : healthData.medications.includes(medication)
+                              ? 'bg-blue-500 border-blue-600 text-white shadow-sm'
+                              : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                    "
+                >
+                    <div class="text-center">
+                        <div class="font-medium leading-tight">
+                            {{ medication }}
+                            <span v-if="isEditModeMed" class="block text-red-500 mt-0.5">Remove</span>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="commonMedications.length === 0" class="col-span-full text-center py-8 text-gray-500">No medications added yet. Click "Add New" to get started.</div>
+            </div>
+        </div>
+        <!-- </div> -->
+        <!-- <div class="col-span-12 xl:col-span-6"> -->
+        <div class="card">
             <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
                 <span class="text-2xl">🚽</span>
                 Toilet Log
@@ -370,7 +418,7 @@ onMounted(async () => {
                     </div>
 
                     <!-- Details section -->
-                    <div class="mt-3 pt-3 border-t border-gray-200">
+                    <!-- <div class="mt-3 pt-3 border-t border-gray-200">
                         <div v-if="entry.type === 'poop' && (entry.consistency || entry.color || entry.notes)" class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                             <div v-if="entry.consistency" class="flex items-center gap-2">
                                 <span class="font-medium text-gray-700">Consistency:</span>
@@ -391,90 +439,33 @@ onMounted(async () => {
                         <div v-else class="text-sm text-gray-500 italic">
                             {{ entry.type === 'pee' ? 'No additional details' : 'No detailed information logged' }}
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </div>
 
-        <!-- Vitamins/Supplements -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-semibold flex items-center gap-2">
-                    <span class="text-2xl">💊</span>
-                    Vitamins & Supplements
-                </h2>
-                <div class="flex gap-2">
-                    <Button :label="isEditMode ? 'Done' : 'Edit List'" @click="isEditMode = !isEditMode" :severity="isEditMode ? 'success' : 'secondary'" size="small" />
-                    <Button label="Add New" @click="showAddSupplementDialog = true" size="small" />
-                </div>
-            </div>
-
-            <!-- Supplements Grid -->
-            <div class="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2">
-                <div
-                    v-for="supplement in commonSupplements"
-                    :key="supplement"
-                    @click="isEditMode ? removeSupplement(supplement) : toggleSupplement(supplement)"
-                    class="px-3 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm h-16 flex items-center justify-center"
-                    :class="
-                        isEditMode
-                            ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-                            : healthData.supplements.includes(supplement)
-                              ? 'bg-green-500 border-green-600 text-white shadow-sm'
-                              : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                    "
-                >
-                    <div class="text-center">
-                        <div class="font-medium leading-tight">
-                            {{ supplement }}
-                            <span v-if="isEditMode" class="block text-red-500 mt-0.5">Remove</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="commonSupplements.length === 0" class="col-span-full text-center py-8 text-gray-500">No supplements added yet. Click "Add New" to get started.</div>
-            </div>
-        </div>
-
-        <!-- Medication -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-semibold flex items-center gap-2">
-                    <span class="text-2xl">💉</span>
-                    Medication
-                </h2>
-                <Button label="Add New" @click="showAddMedicationDialog = true" size="small" />
-            </div>
-            <div class="space-y-3">
-                <div v-for="med in commonMedications" :key="med" class="flex items-center justify-between p-3 border rounded-lg">
-                    <span class="font-medium">{{ med }}</span>
-                    <div class="flex items-center gap-2">
-                        <InputText v-model="medTime" placeholder="Time" class="w-20 text-sm" />
-                        <Button label="Take" @click="addMedication(med)" size="small" />
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        <!-- Sleep Tracker -->
         <!-- Sleep Tracker -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
                 <span class="text-2xl">💤</span>
                 Sleep (Last Night)
             </h2>
-            <div class="grid md:grid-cols-2 gap-4">
-                <div>
+
+            <div class="flex flex-col md:flex-row gap-4 mb-4">
+                <div class="w-full sm:w-1/2 md:w-1/2">
                     <label class="block text-sm font-medium mb-2">Hours Slept</label>
                     <InputNumber v-model="healthData.sleep.hours" :min="0" :max="24" :step="0.5" class="w-full" @update:modelValue="updateSleep({ hours: $event })" />
                 </div>
-                <div>
+                <div class="w-full sm:w-1/2 md:w-1/2">
                     <label class="block text-sm font-medium mb-2">Sleep Quality</label>
                     <Dropdown v-model="healthData.sleep.quality" :options="sleepQuality" optionLabel="label" optionValue="value" placeholder="Select quality" class="w-full" @update:modelValue="updateSleep({ quality: $event })" />
                 </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium mb-2">Notes (dreams, disturbances)</label>
-                    <Textarea v-model="healthData.sleep.notes" rows="2" placeholder="How did you sleep? Any dreams or issues?" class="w-full" @update:modelValue="updateSleep({ notes: $event })" />
-                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-2">Notes (dreams, disturbances)</label>
+                <Textarea v-model="healthData.sleep.notes" rows="2" placeholder="How did you sleep? Any dreams or issues?" class="w-full" @update:modelValue="updateSleep({ notes: $event })" />
             </div>
         </div>
 
@@ -518,6 +509,39 @@ onMounted(async () => {
                     <Textarea v-model="healthData.notes" rows="2" placeholder="What's affecting your mood today?" class="w-full" @update:modelValue="updateNotes($event)" />
                 </div>
             </div>
+        </div>
+
+        <div class="card">RAAAF</div>
+        <!-- </div> -->
+    </div>
+
+    <div class="p-6 space-y-8 max-w-4xl mx-auto">
+        <!-- Loading State -->
+        <div v-if="isLoading" class="text-center py-8">
+            <div class="text-lg text-gray-600">Loading health data...</div>
+        </div>
+
+        <!-- Error State -->
+        <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div class="text-red-800">Error: {{ error }}</div>
+        </div>
+
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">💪 Health Tracker</h1>
+
+            <!-- Date Navigation -->
+            <div class="flex items-center justify-center gap-4 mb-4">
+                <Button icon="pi pi-chevron-left" @click="goToPreviousDay" severity="secondary" size="small" aria-label="Previous day" />
+                <div class="flex items-center gap-2">
+                    <span class="text-lg font-medium text-gray-800">{{ formattedDate }}</span>
+                    <Button v-if="!isToday" label="Today" @click="goToToday" size="small" severity="info" />
+                </div>
+                <Button icon="pi pi-chevron-right" @click="goToNextDay" severity="secondary" size="small" aria-label="Next day" />
+            </div>
+
+            <p class="text-gray-600">
+                {{ isToday ? "Today's Health Data" : 'Historical Health Data' }}
+            </p>
         </div>
 
         <!-- Dialogs -->

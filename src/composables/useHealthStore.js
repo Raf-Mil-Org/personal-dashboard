@@ -24,10 +24,10 @@ const isLoading = ref(false);
 const error = ref(null);
 
 // Common supplements list
-const commonSupplements = ['Vitamin D3', 'Vitamin B12', 'Vitamin C', 'Omega-3', 'Magnesium', 'Zinc', 'Iron', 'Calcium', 'Probiotics', 'Creatine', 'Protein Powder', 'Multivitamin'];
+const commonSupplements = ['D3', 'B12', 'C', 'Ω3', 'Mg', 'Zinc', 'Fe', 'Ca', 'PreBio', 'Creat', 'Prot', 'MultVt'];
 
 // Common medications list
-const commonMedications = ['Aspirin', 'Ibuprofen', 'Paracetamol', 'Antihistamine', 'Antibiotics', 'Prescription Med 1', 'Prescription Med 2'];
+const commonMedications = ['Aspirin', 'Ibuprofen', 'Paracetamol', 'Antihistamine', 'Antibiotics', 'Med 1', 'Med 2'];
 
 // API Functions
 const apiCall = async (url, options = {}) => {

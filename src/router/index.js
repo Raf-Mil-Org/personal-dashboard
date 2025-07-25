@@ -19,11 +19,25 @@ const router = createRouter({
                     component: () => import('@/views/ExpensesDashboard.vue')
                 },
                 {
+                    path: '/demo-functionalities',
+                    name: 'demo-functionalities',
+                    component: () => import('@/views/DemoFunctionalities.vue')
+                },
+                {
+                    path: '/chat-gpt',
+                    name: 'chat-gpt',
+                    component: () => import('@/views/ChatGPT.vue')
+                },
+                {
                     path: '/financial-dashboard-2',
                     name: 'financial-dashboard-2',
                     component: () => import('@/views/FinancialDashboard2.vue')
                 },
-
+                {
+                    path: '/financial-dashboard-3',
+                    name: 'financial-dashboard-3',
+                    component: () => import('@/views/FinancialDashboard3.vue')
+                },
                 {
                     path: '/stocks-table',
                     name: 'stocks-table',
