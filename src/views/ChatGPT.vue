@@ -4,7 +4,7 @@ import { ref } from 'vue';
 import axios from 'axios';
 
 // REPLACE WITH YOUR OpenAI API key
-const OPENAI_API_KEY = 'sk-...';
+// const OPENAI_API_KEY = 'sk-...';
 
 const input = ref('');
 const messages = ref([
