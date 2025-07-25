@@ -26,7 +26,7 @@ async function sendMessage() {
             },
             {
                 headers: {
-                    Authorization: `Bearer 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`,
+                    Authorization: `Bearer `,
                     'Content-Type': 'application/json'
                 }
             }
