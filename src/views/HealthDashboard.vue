@@ -445,7 +445,6 @@ onMounted(async () => {
         </div>
 
         <!-- Sleep Tracker -->
-        <!-- Sleep Tracker -->
         <div class="bg-white rounded-lg shadow-md p-6">
             <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
                 <span class="text-2xl">💤</span>

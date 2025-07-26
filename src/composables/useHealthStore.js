@@ -1,333 +1,183 @@
+// composables/useHealthStore.js
+import { loadHealthData, saveHealthData } from '@/api/health';
 import { computed, ref } from 'vue';
 
-const API_BASE_URL = 'http://localhost:3001/api/health';
-
-// State
-const healthData = ref({
-    waterIntake: 0,
-    vitamins: [],
-    medications: [],
-    toiletLogs: [],
-    sleep: {
-        hours: 0,
-        quality: 'good',
-        notes: ''
-    },
-    workouts: [],
-    mood: 'okay',
-    notes: '',
-    supplements: []
-});
-
+const healthData = ref(createDefaultHealthData());
 const selectedDate = ref(new Date().toISOString().split('T')[0]);
 const isLoading = ref(false);
 const error = ref(null);
 
-// Common supplements list
-const commonSupplements = ['D3', 'B12', 'C', 'Ω3', 'Mg', 'Zinc', 'Fe', 'Ca', 'PreBio', 'Creat', 'Prot', 'MultVt'];
+const commonSupplements = ref([]);
+const commonMedications = ref([]);
 
-// Common medications list
-const commonMedications = ['Aspirin', 'Ibuprofen', 'Paracetamol', 'Antihistamine', 'Antibiotics', 'Med 1', 'Med 2'];
+function createDefaultHealthData() {
+    return {
+        waterIntake: 0,
+        vitamins: [],
+        medications: [],
+        toiletLogs: [],
+        sleep: { hours: 0, quality: 'good', notes: '' },
+        workouts: [],
+        mood: 'okay',
+        notes: '',
+        supplements: []
+    };
+}
 
-// API Functions
-const apiCall = async (url, options = {}) => {
+function toggleItem(list, item) {
+    const index = list.indexOf(item);
+    if (index === -1) list.push(item);
+    else list.splice(index, 1);
+}
+
+async function initialize() {
     try {
         isLoading.value = true;
-        error.value = null;
+        const data = await loadHealthData(selectedDate.value);
+        healthData.value = { ...createDefaultHealthData(), ...data };
 
-        const response = await fetch(url, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            },
-            ...options
-        });
+        // Sync dynamic lists
+        const supplementSet = new Set([...createDefaultHealthData().supplements, ...(data?.supplements || [])]);
+        commonSupplements.value = Array.from(supplementSet).sort();
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
+        const medSet = new Set([...createDefaultHealthData().medications, ...(data?.medications || [])]);
+        commonMedications.value = Array.from(medSet).sort();
     } catch (err) {
+        console.error('Error loading data:', err);
         error.value = err.message;
-        console.error('API Error:', err);
-        throw err;
+        healthData.value = createDefaultHealthData();
     } finally {
         isLoading.value = false;
     }
-};
-
-const loadHealthData = async (date) => {
-    try {
-        const data = await apiCall(`${API_BASE_URL}/${date}`);
-
-        // Ensure all arrays and objects are properly initialized
-        healthData.value = {
-            waterIntake: data.waterIntake || 0,
-            vitamins: Array.isArray(data.vitamins) ? data.vitamins : [],
-            medications: Array.isArray(data.medications) ? data.medications : [],
-            toiletLogs: Array.isArray(data.toiletLogs) ? data.toiletLogs : [],
-            sleep: {
-                hours: data.sleep?.hours || 0,
-                quality: data.sleep?.quality || 'good',
-                notes: data.sleep?.notes || ''
-            },
-            workouts: Array.isArray(data.workouts) ? data.workouts : [],
-            mood: data.mood || 'okay',
-            notes: data.notes || '',
-            supplements: Array.isArray(data.supplements) ? data.supplements : []
-        };
-    } catch (err) {
-        console.error('Failed to load health data:', err);
-        // Initialize with defaults if API fails
-        healthData.value = {
-            waterIntake: 0,
-            vitamins: [],
-            medications: [],
-            toiletLogs: [],
-            sleep: { hours: 0, quality: 'good', notes: '' },
-            workouts: [],
-            mood: 'okay',
-            notes: '',
-            supplements: []
-        };
-    }
-};
-
-// Utility to convert camelCase to snake_case
-function toSnakeCase(obj) {
-    if (Array.isArray(obj)) {
-        return obj.map(toSnakeCase);
-    } else if (obj && typeof obj === 'object') {
-        const newObj = {};
-        for (const key in obj) {
-            if (!Object.hasOwn(obj, key)) continue;
-            const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-            newObj[snakeKey] = toSnakeCase(obj[key]);
-        }
-        return newObj;
-    }
-    return obj;
 }
 
-const saveHealthData = async (date) => {
+async function persist() {
     try {
-        // Prepare data for backend: convert camelCase to snake_case and flatten toilet logs
-        const dataToSave = JSON.parse(JSON.stringify(healthData.value));
-        // Flatten toilet logs if needed
-        if (Array.isArray(dataToSave.toiletLogs)) {
-            dataToSave.toiletLogs = dataToSave.toiletLogs.map((log, idx) => {
-                // If log.details exists, flatten it
-                if (log.details) {
-                    return {
-                        id: log.id || idx,
-                        type: log.type,
-                        time: log.time,
-                        date: log.date || date,
-                        consistency: log.details.consistency ?? log.consistency,
-                        color: log.details.color ?? log.color,
-                        notes: log.details.notes ?? log.notes
-                    };
-                } else {
-                    return {
-                        id: log.id || idx,
-                        type: log.type,
-                        time: log.time,
-                        date: log.date || date,
-                        consistency: log.consistency,
-                        color: log.color,
-                        notes: log.notes
-                    };
-                }
-            });
-        }
-        // Convert to snake_case for backend
-        const snakeData = toSnakeCase({ ...dataToSave, date });
-        console.log('[saveHealthData] POST /api/health/ with:', snakeData);
-        await apiCall(`${API_BASE_URL}/`, {
-            method: 'POST',
-            body: JSON.stringify(snakeData)
-        });
+        await saveHealthData(selectedDate.value, { ...healthData.value, date: selectedDate.value });
     } catch (err) {
-        console.error('Failed to save health data:', err);
-        throw err;
+        console.error('Error saving data:', err);
     }
-};
+}
 
-// Actions
-const addWater = () => {
+// Action handlers
+function updateSleep(payload) {
+    healthData.value.sleep = { ...healthData.value.sleep, ...payload };
+    persist();
+}
+
+function updateMood(mood) {
+    healthData.value.mood = mood;
+    persist();
+}
+
+function updateNotes(notes) {
+    healthData.value.notes = notes;
+    persist();
+}
+
+function addWater() {
     healthData.value.waterIntake++;
-    saveHealthData(selectedDate.value);
-};
+    persist();
+}
 
-const removeWater = () => {
+function removeWater() {
     if (healthData.value.waterIntake > 0) {
         healthData.value.waterIntake--;
-        saveHealthData(selectedDate.value);
+        persist();
     }
-};
+}
 
-const addToiletLog = (type, details = {}) => {
-    const log = {
-        type,
-        time: new Date().toLocaleTimeString(),
-        details
-    };
-    healthData.value.toiletLogs.push(log);
-    saveHealthData(selectedDate.value);
-};
+function toggleSupplement(s) {
+    toggleItem(healthData.value.supplements, s);
+    persist();
+}
 
-const removeToiletLog = (index) => {
-    healthData.value.toiletLogs.splice(index, 1);
-    saveHealthData(selectedDate.value);
-};
-
-const updateToiletLog = (index, updatedLog) => {
-    try {
-        healthData.value.toiletLogs[index] = updatedLog;
-        saveHealthData(selectedDate.value);
-    } catch (err) {
-        console.error('Error in updateToiletLog:', err);
-    }
-};
-
-const addVitamin = (vitamin) => {
-    if (!healthData.value.vitamins.includes(vitamin)) {
-        healthData.value.vitamins.push(vitamin);
-        saveHealthData(selectedDate.value);
-    }
-};
-
-const removeVitamin = (vitamin) => {
-    const index = healthData.value.vitamins.indexOf(vitamin);
-    if (index > -1) {
-        healthData.value.vitamins.splice(index, 1);
-        saveHealthData(selectedDate.value);
-    }
-};
-
-const toggleVitamin = (vitamin) => {
-    if (healthData.value.vitamins.includes(vitamin)) {
-        removeVitamin(vitamin);
-    } else {
-        addVitamin(vitamin);
-    }
-};
-
-const addMedication = (medication) => {
-    if (!healthData.value.medications.includes(medication)) {
-        healthData.value.medications.push(medication);
-        saveHealthData(selectedDate.value);
-    }
-};
-
-const removeMedication = (medication) => {
-    const index = healthData.value.medications.indexOf(medication);
-    if (index > -1) {
-        healthData.value.medications.splice(index, 1);
-        saveHealthData(selectedDate.value);
-    }
-};
-
-const toggleMedication = (medication) => {
-    if (healthData.value.medications.includes(medication)) {
-        removeMedication(medication);
-    } else {
-        addMedication(medication);
-    }
-};
-
-const updateSleep = (sleepData) => {
-    healthData.value.sleep = { ...healthData.value.sleep, ...sleepData };
-    saveHealthData(selectedDate.value);
-};
-
-const addWorkout = (workout) => {
-    healthData.value.workouts.push(workout);
-    saveHealthData(selectedDate.value);
-};
-
-const removeWorkout = (index) => {
-    healthData.value.workouts.splice(index, 1);
-    saveHealthData(selectedDate.value);
-};
-
-const updateMood = (mood) => {
-    healthData.value.mood = mood;
-    saveHealthData(selectedDate.value);
-};
-
-const updateNotes = (notes) => {
-    healthData.value.notes = notes;
-    saveHealthData(selectedDate.value);
-};
-
-const addSupplement = (supplement) => {
+function addSupplement(supplement) {
     if (!healthData.value.supplements.includes(supplement)) {
         healthData.value.supplements.push(supplement);
-        saveHealthData(selectedDate.value);
+        if (!commonSupplements.value.includes(supplement)) {
+            commonSupplements.value.push(supplement);
+        }
+        persist();
     }
-};
+}
 
-const removeSupplement = (supplement) => {
+function removeSupplement(supplement) {
     const index = healthData.value.supplements.indexOf(supplement);
     if (index > -1) {
         healthData.value.supplements.splice(index, 1);
-        saveHealthData(selectedDate.value);
+        persist();
     }
-};
+}
 
-const toggleSupplement = (supplement) => {
-    if (healthData.value.supplements.includes(supplement)) {
-        removeSupplement(supplement);
-    } else {
-        addSupplement(supplement);
+function toggleMedication(m) {
+    toggleItem(healthData.value.medications, m);
+    persist();
+}
+
+function addMedication(medication) {
+    if (!healthData.value.medications.includes(medication)) {
+        healthData.value.medications.push(medication);
+        if (!commonMedications.value.includes(medication)) {
+            commonMedications.value.push(medication);
+        }
+        persist();
     }
-};
+}
 
-const changeDate = async (date) => {
-    selectedDate.value = date;
-    await loadHealthData(date);
-};
+function removeMedication(medication) {
+    const index = healthData.value.medications.indexOf(medication);
+    if (index > -1) {
+        healthData.value.medications.splice(index, 1);
+        persist();
+    }
+}
 
-const goToPreviousDay = async () => {
-    const currentDate = new Date(selectedDate.value);
-    currentDate.setDate(currentDate.getDate() - 1);
-    const newDate = currentDate.toISOString().split('T')[0];
-    await changeDate(newDate);
-};
+function addWorkout(w) {
+    healthData.value.workouts.push(w);
+    persist();
+}
 
-const goToNextDay = async () => {
-    const currentDate = new Date(selectedDate.value);
-    currentDate.setDate(currentDate.getDate() + 1);
-    const newDate = currentDate.toISOString().split('T')[0];
-    await changeDate(newDate);
-};
+function addToiletLog(type, details = {}) {
+    const log = { type, time: new Date().toLocaleTimeString(), date: selectedDate.value, ...details };
+    healthData.value.toiletLogs.push(log);
+    persist();
+}
 
-const goToToday = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    await changeDate(today);
-};
+function updateToiletLog(index, updated) {
+    healthData.value.toiletLogs[index] = { ...healthData.value.toiletLogs[index], ...updated };
+    persist();
+}
 
-// Computed
-const waterProgress = computed(() => {
-    const target = 8; // 8 glasses per day
-    return Math.min((healthData.value.waterIntake / target) * 100, 100);
-});
+function removeToiletLog(index) {
+    healthData.value.toiletLogs.splice(index, 1);
+    persist();
+}
 
-const sleepProgress = computed(() => {
-    const target = 8; // 8 hours per day
-    return Math.min((healthData.value.sleep.hours / target) * 100, 100);
-});
+function goToPreviousDay() {
+    const d = new Date(selectedDate.value);
+    d.setDate(d.getDate() - 1);
+    selectedDate.value = d.toISOString().split('T')[0];
+    initialize();
+}
 
-const isToday = computed(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return selectedDate.value === today;
-});
+function goToNextDay() {
+    const d = new Date(selectedDate.value);
+    d.setDate(d.getDate() + 1);
+    selectedDate.value = d.toISOString().split('T')[0];
+    initialize();
+}
 
+function goToToday() {
+    selectedDate.value = new Date().toISOString().split('T')[0];
+    initialize();
+}
+
+const waterProgress = computed(() => Math.min((healthData.value.waterIntake / 8) * 100, 100));
+const sleepProgress = computed(() => Math.min((healthData.value.sleep.hours / 8) * 100, 100));
+const isToday = computed(() => selectedDate.value === new Date().toISOString().split('T')[0]);
 const formattedDate = computed(() => {
-    const date = new Date(selectedDate.value);
-    return date.toLocaleDateString('en-US', {
+    return new Date(selectedDate.value).toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -335,14 +185,8 @@ const formattedDate = computed(() => {
     });
 });
 
-// Initialize
-const initialize = async () => {
-    await loadHealthData(selectedDate.value);
-};
-
 export function useHealthStore() {
     return {
-        // State
         healthData,
         selectedDate,
         isLoading,
@@ -350,39 +194,30 @@ export function useHealthStore() {
         commonSupplements,
         commonMedications,
 
-        // Actions
         addWater,
         removeWater,
-        addToiletLog,
-        removeToiletLog,
-        updateToiletLog,
-        addVitamin,
-        removeVitamin,
-        toggleVitamin,
-        addMedication,
-        removeMedication,
-        toggleMedication,
         updateSleep,
-        addWorkout,
-        removeWorkout,
         updateMood,
         updateNotes,
+        toggleSupplement,
         addSupplement,
         removeSupplement,
-        toggleSupplement,
-        changeDate,
+        toggleMedication,
+        addMedication,
+        removeMedication,
+        addWorkout,
+        addToiletLog,
+        updateToiletLog,
+        removeToiletLog,
+
         goToPreviousDay,
         goToNextDay,
         goToToday,
         initialize,
 
-        // Computed
         waterProgress,
         sleepProgress,
         isToday,
-        formattedDate,
-
-        // Utility
-        saveHealthData
+        formattedDate
     };
 }
