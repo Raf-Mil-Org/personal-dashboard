@@ -294,9 +294,9 @@ onMounted(async () => {
                         {{ healthData.waterIntake }} glasses / 8 glasses
                         <span class="text-xs">({{ healthData.waterIntake * 250 }}ml)</span>
                     </div>
-                    <div class="text-sm font-medium text-blue-600">{{ Math.round(waterProgress) }}%</div>
+                    <!-- <div class="text-sm font-medium text-blue-600">{{ Math.round(waterProgress) }}%</div> -->
                 </div>
-                <ProgressBar :value="waterProgress" class="h-3" />
+                <ProgressBar :value="waterProgress" showValue="false" class="h-3">{{ healthData.waterIntake * 250 }}ml</ProgressBar>
                 <div class="flex gap-2 flex-wrap">
                     <Button label="+1 Glass" @click="addWater" size="small" />
                     <Button label="-1 Glass" @click="removeWater" size="small" severity="secondary" />
@@ -330,20 +330,20 @@ onMounted(async () => {
             <div class="grid grid-cols-[repeat(auto-fit,minmax(50px,1fr))] gap-2">
                 <div
                     v-for="supplement in commonSupplements"
-                    :key="supplement"
+                    :key="supplement.id"
                     @click="isEditMode ? removeSupplement(supplement) : toggleSupplement(supplement)"
                     class="px-3 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm flex items-center justify-center"
                     :class="
                         isEditMode
                             ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-                            : healthData.supplements.includes(supplement)
+                            : healthData.supplements.find((s) => s.id === supplement.id && s.consumed)
                               ? 'bg-green-500 border-green-600 text-white shadow-sm'
                               : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                     "
                 >
                     <div class="text-center">
                         <div class="font-medium leading-tight">
-                            {{ supplement }}
+                            {{ supplement.name }}
                             <!-- <span v-if="isEditMode" class="block text-red-500 mt-0.5">Remove</span> -->
                         </div>
                     </div>
@@ -359,7 +359,7 @@ onMounted(async () => {
                     Medication
                 </h2>
                 <div class="flex gap-2">
-                    <Button :icon="isEditMode ? 'pi pi-check' : 'pi pi-pencil'" @click="isEditModeMed = !isEditModeMed" :severity="isEditModeMed ? 'success' : 'secondary'" size="small" />
+                    <Button :icon="isEditModeMed ? 'pi pi-check' : 'pi pi-pencil'" @click="isEditModeMed = !isEditModeMed" :severity="isEditModeMed ? 'success' : 'secondary'" size="small" />
                     <Button icon="pi pi-plus" @click="showAddMedicationDialog = true" size="small" />
                 </div>
             </div>
@@ -368,20 +368,20 @@ onMounted(async () => {
             <div class="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-2">
                 <div
                     v-for="medication in commonMedications"
-                    :key="medication"
+                    :key="medication.id"
                     @click="isEditModeMed ? removeMedication(medication) : toggleMedication(medication)"
                     class="px-3 py-2 border rounded transition-all duration-200 cursor-pointer hover:shadow-sm flex items-center justify-center"
                     :class="
                         isEditModeMed
                             ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-                            : healthData.medications.includes(medication)
+                            : healthData.medications.find((m) => m.id === medication.id && m.consumed)
                               ? 'bg-blue-500 border-blue-600 text-white shadow-sm'
                               : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                     "
                 >
                     <div class="text-center">
                         <div class="font-medium leading-tight">
-                            {{ medication }}
+                            {{ medication.name }}
                             <span v-if="isEditModeMed" class="block text-red-500 mt-0.5">Remove</span>
                         </div>
                     </div>
