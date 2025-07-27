@@ -327,7 +327,7 @@ onMounted(async () => {
             </div>
 
             <!-- Supplements Grid -->
-            <div class="grid grid-cols-[repeat(auto-fit,minmax(50px,1fr))] gap-2">
+            <div class="flex flex-wrap gap-2">
                 <div
                     v-for="supplement in commonSupplements"
                     :key="supplement.id"
@@ -365,7 +365,7 @@ onMounted(async () => {
             </div>
             <!-- Medications Grid -->
             <!-- <div class="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2"> -->
-            <div class="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-2">
+            <div class="flex flex-wrap gap-2">
                 <div
                     v-for="medication in commonMedications"
                     :key="medication.id"
@@ -375,7 +375,7 @@ onMounted(async () => {
                         isEditModeMed
                             ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
                             : healthData.medications.find((m) => m.id === medication.id && m.consumed)
-                              ? 'bg-blue-500 border-blue-600 text-white shadow-sm'
+                              ? 'bg-green-500 border-green-600 text-white shadow-sm'
                               : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
                     "
                 >

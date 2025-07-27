@@ -160,11 +160,7 @@ async function persist() {
         // Map frontend fields to backend schema and ensure all required fields
         const payload = {
             date: selectedDate.value,
-            water_intake: {
-                glasses: healthData.value.waterIntake,
-                ml: healthData.value.waterIntake * 250,
-                goal_ml: 2000 // You can adjust this as needed
-            },
+            waterIntake: healthData.value.waterIntake,
             toilet_logs: mapToiletLogs(healthData.value.toiletLogs),
             supplements: validSupplements, // Use validated supplements
             medications: validMedications, // Use validated medications
