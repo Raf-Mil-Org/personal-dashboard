@@ -46,27 +46,54 @@ function generateNumericId() {
 }
 
 function mapToiletLogs(logs) {
-    return (logs || []).map(log => ({
-        id: String(log.id || generateNumericId()),
-        type: log.type,
-        time: log.time || new Date().toLocaleTimeString(),
-        date: log.date || selectedDate.value,
-        consistency: log.consistency ?? undefined,
-        color: log.color ?? undefined,
-        notes: log.notes ?? ''
-    }));
+    return (logs || []).map(log => {
+        const details = log.details || {};
+        let consistency = details.consistency != null ? details.consistency : (log.consistency != null ? log.consistency : undefined);
+        if (consistency != null) consistency = Number(consistency);
+        return {
+            type: log.type,
+            time: log.time || new Date().toLocaleTimeString(),
+            details: {
+                consistency,
+                color: details.color ?? log.color ?? undefined,
+                notes: details.notes ?? log.notes ?? ''
+            }
+        };
+    });
 }
 
 function mapWorkouts(workouts) {
-    return (workouts || []).map(w => ({
+    // Parse if string
+    if (typeof workouts === 'string') {
+        try {
+            workouts = JSON.parse(workouts);
+        } catch (e) {
+            console.error('❌ Invalid workouts string', e);
+            workouts = [];
+        }
+    }
+
+    // Flatten if accidentally double-nested
+    if (Array.isArray(workouts) && Array.isArray(workouts[0])) {
+        workouts = workouts.flat();
+    }
+
+    const kal = (workouts || []).map(w => ({
         id: String(w.id || generateNumericId()),
-        type: w.type,
-        duration: w.duration,
-        intensity: w.intensity || 'Medium',
+        type: (Array.isArray(w.type) ? w.type : [w.type]).map(t =>
+            typeof t === 'object' && t !== null ? t.value : t
+        ),
+        duration: (Array.isArray(w.duration) ? w.duration : [w.duration]).map(d =>
+            typeof d === 'object' && d !== null ? Number(d.value) : Number(d)
+        ),
+        intensity: (Array.isArray(w.intensity) ? w.intensity : [w.intensity]).map(i =>
+            typeof i === 'object' && i !== null ? i.value : i
+        ),
         notes: w.notes || '',
         time: w.time || new Date().toLocaleTimeString(),
         date: w.date || selectedDate.value
     }));
+    return kal;
 }
 
 function mapMedications(meds) {
@@ -161,7 +188,7 @@ async function persist() {
         const payload = {
             date: selectedDate.value,
             waterIntake: healthData.value.waterIntake,
-            toilet_logs: mapToiletLogs(healthData.value.toiletLogs),
+            toiletLogs: mapToiletLogs(healthData.value.toiletLogs),
             supplements: validSupplements, // Use validated supplements
             medications: validMedications, // Use validated medications
             workouts: mapWorkouts(healthData.value.workouts),
@@ -300,7 +327,26 @@ function addToiletLog(type, details = {}) {
 }
 
 function updateToiletLog(index, updated) {
-    healthData.value.toiletLogs[index] = { ...healthData.value.toiletLogs[index], ...updated };
+    // If any of the details fields are present, update details object
+    const log = healthData.value.toiletLogs[index];
+    const newLog = { ...log, ...updated };
+    if (
+        'consistency' in updated ||
+        'color' in updated ||
+        'notes' in updated
+    ) {
+        newLog.details = {
+            ...log.details,
+            consistency: updated.consistency ?? log.details?.consistency,
+            color: updated.color ?? log.details?.color,
+            notes: updated.notes ?? log.details?.notes
+        };
+        // Remove top-level fields if present
+        delete newLog.consistency;
+        delete newLog.color;
+        delete newLog.notes;
+    }
+    healthData.value.toiletLogs[index] = newLog;
     persist();
 }
 

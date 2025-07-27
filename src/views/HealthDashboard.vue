@@ -7,6 +7,7 @@ import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import ProgressBar from 'primevue/progressbar';
 import Textarea from 'primevue/textarea';
+// import SelectButton from 'primevue/selectbutton'; // Removed as per edit hint
 import { onMounted, ref } from 'vue';
 
 const {
@@ -63,15 +64,15 @@ const isEditModeMed = ref(false);
 // Form data for dialogs
 const toiletForm = ref({
     type: 'pee',
-    consistency: null,
+    consistency: null, // back to single value
     color: null,
     notes: ''
 });
 
 const workoutForm = ref({
-    type: '',
-    duration: 0,
-    intensity: 'medium',
+    type: [],
+    duration: [], // now an array for multiple select
+    intensity: [], // now an array for multiple select
     notes: ''
 });
 
@@ -146,8 +147,25 @@ const stoolColors = [
     { label: 'Red', value: 'red' }
 ];
 
-const workoutTypes = ['Cardio', 'Weights', 'Yoga', 'Stretching', 'Walk', 'Run', 'Swimming', 'Cycling', 'HIIT', 'Pilates'];
+const workoutTypes = [
+    { name: 'Cardio', value: 'cardio' },
+    { name: 'Weights', value: 'weights' },
+    { name: 'Yoga', value: 'yoga' },
+    { name: 'Stretching', value: 'stretching' },
+    { name: 'Walk', value: 'walk' },
+    { name: 'Run', value: 'run' },
+    { name: 'Swimming', value: 'swimming' },
+    { name: 'Cycling', value: 'cycling' },
+    { name: 'HIIT', value: 'hiit' },
+    { name: 'Pilates', value: 'pilates' }
+];
 const intensityLevels = ['Low', 'Medium', 'High'];
+
+const intensityOptions = [
+    { name: 'Low', value: 'low' },
+    { name: 'Medium', value: 'medium' },
+    { name: 'High', value: 'high' }
+];
 
 const moodOptions = [
     { label: '😊 Happy', value: 'happy' },
@@ -168,6 +186,13 @@ const sleepQuality = [
     { label: '😊 Good (3)', value: 3 },
     { label: '😌 Very Good (4)', value: 4 },
     { label: '😍 Excellent (5)', value: 5 }
+];
+
+const durationOptions = [
+    { name: '30 min', value: 30 },
+    { name: '45 min', value: 45 },
+    { name: '60 min', value: 60 },
+    { name: '90 min', value: 90 }
 ];
 
 // Date navigation functions - using functions from health store
@@ -207,41 +232,45 @@ function viewToiletDetails(entry) {
         type: entry.type || 'pee',
         time: entry.time,
         date: entry.date,
-        consistency: entry.consistency,
-        color: entry.color,
-        notes: entry.notes
+        consistency: entry.details?.consistency != null ? Number(entry.details.consistency) : null,
+        color: entry.details?.color,
+        notes: entry.details?.notes
     };
     toiletForm.value = {
         type: entry.type || 'pee',
-        consistency: entry.consistency || null,
-        color: entry.color || null,
-        notes: entry.notes || ''
+        consistency: entry.details?.consistency != null ? Number(entry.details.consistency) : null,
+        color: entry.details?.color || null,
+        notes: entry.details?.notes || ''
     };
     showToiletDetailsDialog.value = true;
 }
 
 function updateToiletEntry() {
-    if (selectedToiletEntry.value && selectedToiletEntry.value.id) {
-        // Use the store's updateToiletLog function for safety
-        updateToiletLog(selectedToiletEntry.value.id, {
-            type: toiletForm.value.type,
-            consistency: toiletForm.value.consistency,
-            color: toiletForm.value.color,
-            notes: toiletForm.value.notes
-        });
+    if (selectedToiletEntry.value) {
+        // Find the index of the log being edited (use time and type as unique keys)
+        const logs = healthData.value.toiletLogs || [];
+        const idx = logs.findIndex((entry) => entry && entry.time === selectedToiletEntry.value.time && entry.type === selectedToiletEntry.value.type);
+        if (idx !== -1) {
+            updateToiletLog(idx, {
+                type: toiletForm.value.type,
+                consistency: toiletForm.value.consistency,
+                color: toiletForm.value.color,
+                notes: toiletForm.value.notes
+            });
+        }
     }
     showToiletDetailsDialog.value = false;
     selectedToiletEntry.value = null;
     toiletForm.value = { type: 'pee', consistency: null, color: null, notes: '' };
 }
 
-function deleteToiletEntry(entryId) {
-    const logs = healthData.value.toiletLogs || [];
-    const index = logs.findIndex((entry) => entry && entry.id === entryId);
-    if (index !== -1) {
-        logs.splice(index, 1);
-        healthData.value.toiletLogs = logs;
-        saveHealthData(selectedDate.value);
+function deleteToiletEntry() {
+    if (selectedToiletEntry.value) {
+        const logs = healthData.value.toiletLogs || [];
+        const idx = logs.findIndex((entry) => entry && entry.time === selectedToiletEntry.value.time && entry.type === selectedToiletEntry.value.type);
+        if (idx !== -1) {
+            removeToiletLog(idx);
+        }
     }
     showToiletDetailsDialog.value = false;
     selectedToiletEntry.value = null;
@@ -249,7 +278,7 @@ function deleteToiletEntry(entryId) {
 
 function submitWorkout() {
     addWorkout(workoutForm.value);
-    workoutForm.value = { type: '', duration: 0, intensity: 'medium', notes: '' };
+    workoutForm.value = { type: [], duration: [], intensity: [], notes: '' };
     showWorkoutDialog.value = false;
 }
 
@@ -412,8 +441,13 @@ onMounted(async () => {
                                 <div class="text-sm text-gray-600">{{ entry.time }}</div>
                             </div>
                         </div>
+
+                        <div v-if="entry.type === 'poop' && entry.details?.consistency" class="flex items-center gap-3">
+                            <div v-html="bristolScale.find((option) => option.value === entry.details?.consistency)?.icon" class="flex-shrink-0"></div>
+                            <span>{{ bristolScale.find((option) => option.value === entry.details?.consistency)?.label }}</span>
+                        </div>
                         <div class="flex gap-1">
-                            <Button label="Edit" @click="viewToiletDetails(entry)" size="small" />
+                            <Button icon="pi pi-pencil" @click="viewToiletDetails(entry)" size="small" />
                         </div>
                     </div>
 
@@ -656,7 +690,7 @@ onMounted(async () => {
                     <Textarea v-model="toiletForm.notes" rows="2" placeholder="Any issues or observations?" class="w-full" />
                 </div>
                 <div class="flex justify-between">
-                    <Button label="Delete" @click="deleteToiletEntry(selectedToiletEntry?.id)" severity="danger" />
+                    <Button label="Delete" @click="deleteToiletEntry" severity="danger" />
                     <div class="flex gap-2">
                         <Button label="Cancel" @click="showToiletDetailsDialog = false" severity="secondary" />
                         <Button label="Update" @click="updateToiletEntry" />
@@ -665,19 +699,37 @@ onMounted(async () => {
             </div>
         </Dialog>
 
-        <Dialog v-model:visible="showWorkoutDialog" header="Log Workout" modal>
+        <Dialog v-model:visible="showWorkoutDialog" header="Log Workout" modal :style="{ width: '350px', maxWidth: '90vw' }">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-2">Workout Type</label>
-                    <Dropdown v-model="workoutForm.type" :options="workoutTypes" placeholder="Select type" class="w-full" />
+                    <div class="flex justify-center w-full flex-wrap">
+                        <SelectButton
+                            :pt="{
+                                root: 'max-w-full h-auto flex flex-wrap'
+                            }"
+                            v-model="workoutForm.type"
+                            :options="workoutTypes"
+                            optionLabel="name"
+                            multiple
+                            aria-labelledby="multiple"
+                        />
+                    </div>
+                    <!-- <Dropdown v-model="workoutForm.type" :options="workoutTypes" placeholder="Select type" class="w-full" /> -->
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-2">Duration (minutes)</label>
-                    <InputNumber v-model="workoutForm.duration" :min="1" :max="300" class="w-full" />
+                    <div class="flex justify-center w-full flex-wrap">
+                        <SelectButton :pt="{ root: 'max-w-full h-auto flex flex-wrap' }" v-model="workoutForm.duration" :options="durationOptions" optionLabel="name" aria-labelledby="multiple" />
+                    </div>
+                    <!-- <InputNumber v-model="workoutForm.duration" :min="1" :max="300" class="w-full" /> -->
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-2">Intensity</label>
-                    <Dropdown v-model="workoutForm.intensity" :options="intensityLevels" placeholder="Select intensity" class="w-full" />
+                    <div class="flex justify-center w-full flex-wrap">
+                        <SelectButton :pt="{ root: 'max-w-full h-auto flex flex-wrap' }" v-model="workoutForm.intensity" :options="intensityOptions" optionLabel="name" aria-labelledby="multiple" />
+                    </div>
+                    <!-- <Dropdown v-model="workoutForm.intensity" :options="intensityLevels" placeholder="Select intensity" class="w-full" /> -->
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-2">Notes</label>

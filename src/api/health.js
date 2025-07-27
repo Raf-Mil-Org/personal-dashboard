@@ -16,6 +16,7 @@ export async function loadHealthData(date) {
 }
 
 export async function saveHealthData(date, data) {
+    console.log('typeof data.workouts:', typeof data.workouts, data.workouts);
     return await apiCall(`${API_BASE_URL}/${date}`, {
         method: 'PUT',
         body: JSON.stringify(data)
