@@ -35,6 +35,25 @@ This project is a **Personal Health Dashboard** web application. It allows users
 
 Visit the [documentation](https://sakai.primevue.org/documentation) to get started.
 
+## 📚 Project Documentation
+
+This project includes comprehensive documentation for development, troubleshooting, and best practices:
+
+-   **[Documentation Index](./docs/README.md)** - Central hub for all project documentation
+-   **[Transaction Analyzer Guide](./docs/TRANSACTION_ANALYZER_PROMPT.md)** - Complete implementation guide for the financial transaction analyzer
+-   **[Common Issues](./docs/COMMON_ISSUES.md)** - Troubleshooting guide for known problems and solutions
+-   **[PrimeVue Patterns](./docs/PRIMEVUE_PATTERNS.md)** - Best practices for PrimeVue component usage
+-   **[Documentation Standards](./docs/DOCUMENTATION_STANDARDS.md)** - Guidelines for maintaining documentation
+
+### 🔄 Documentation Update Process
+
+When making changes to the project:
+
+1. **Update relevant documentation** - Check `docs/README.md` for affected files
+2. **Add to update history** - Include date and description of changes
+3. **Test documented steps** - Ensure instructions work correctly
+4. **Cross-reference updates** - Update related documentation files
+
 ---
 
 For suggestions and planned improvements, see [IMPROVEMENTS.md](./IMPROVEMENTS.md).

@@ -15,6 +15,7 @@ const model = ref([
             { label: 'Demo Functionalities', icon: 'pi pi-fw pi-home', to: '/demo-functionalities' },
             { label: 'Stocks Table', icon: 'pi pi-fw pi-home', to: '/stocks-table' },
             { label: 'Financial Dashboard Claude', icon: 'pi pi-fw pi-home', to: '/financial-dashboard-claude' },
+            { label: 'Transaction Analyzer', icon: 'pi pi-fw pi-chart-line', to: '/transaction-analyzer' },
             { label: 'Visuals Dashboard', icon: 'pi pi-fw pi-home', to: '/visuals-dashboard' },
             { label: 'Customers Overview', icon: 'pi pi-fw pi-home', to: '/customers-overview' },
             { label: 'Task Planner', icon: 'pi pi-fw pi-home', to: '/task-planner' },

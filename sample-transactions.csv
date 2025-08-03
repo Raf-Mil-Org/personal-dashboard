@@ -1,0 +1,17 @@
+Date,Description,Amount,Counterparty,Account,Category
+2024-01-15,Grocery Store Purchase,-125.50,ALBERT HEIJN,Main Account,Food
+2024-01-16,Salary Deposit,2500.00,Company Inc,Main Account,Income
+2024-01-17,Gas Station,-45.20,Shell,Main Account,Transport
+2024-01-18,Restaurant Dinner,-89.75,Italian Restaurant,Main Account,Dining
+2024-01-19,Netflix Subscription,-15.99,Netflix,Main Account,Entertainment
+2024-01-20,Utility Bill,-156.30,Energy Company,Main Account,Utilities
+2024-01-21,ATM Withdrawal,-200.00,,Main Account,Cash
+2024-01-22,Online Shopping,-67.45,Amazon,Main Account,Shopping
+2024-01-23,Doctor Visit,-85.00,Medical Center,Main Account,Health
+2024-01-24,Rent Payment,-1200.00,Landlord,Main Account,Housing
+2024-01-25,Freelance Payment,800.00,Client ABC,Main Account,Income
+2024-01-26,Public Transport,-12.50,Metro Company,Main Account,Transport
+2024-01-27,Coffee Shop,-4.50,Starbucks,Main Account,Dining
+2024-01-28,Phone Bill,-35.00,Telecom Provider,Main Account,Utilities
+2024-01-29,Gym Membership,-45.00,Fitness Center,Main Account,Health
+2024-01-30,Book Purchase,-23.99,Bookstore,Main Account,Entertainment 

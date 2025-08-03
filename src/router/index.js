@@ -94,6 +94,11 @@ const router = createRouter({
                     component: () => import('@/views/ExpensesDashboardClaude.vue')
                 },
                 {
+                    path: '/transaction-analyzer',
+                    name: 'transaction-analyzer',
+                    component: () => import('@/views/TransactionAnalyzer.vue')
+                },
+                {
                     path: '/uikit/formlayout',
                     name: 'formlayout',
                     component: () => import('@/views/uikit/FormLayout.vue')
