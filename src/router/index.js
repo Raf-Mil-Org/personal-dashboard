@@ -34,11 +34,6 @@ const router = createRouter({
                     component: () => import('@/views/FinancialDashboard2.vue')
                 },
                 {
-                    path: '/financial-dashboard-3',
-                    name: 'financial-dashboard-3',
-                    component: () => import('@/views/FinancialDashboard3.vue')
-                },
-                {
                     path: '/stocks-table',
                     name: 'stocks-table',
                     component: () => import('@/views/StocksTable.vue')
@@ -87,11 +82,6 @@ const router = createRouter({
                     path: '/task-planner-2',
                     name: 'task-planner-2',
                     component: () => import('@/views/TaskPlanner2.vue')
-                },
-                {
-                    path: '/financial-dashboard-claude',
-                    name: 'financial-dashboard-claude',
-                    component: () => import('@/views/ExpensesDashboardClaude.vue')
                 },
                 {
                     path: '/transaction-analyzer',
