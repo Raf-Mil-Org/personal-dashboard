@@ -68,19 +68,37 @@ The system now uses a comprehensive, structured category system with predefined 
 -   **Group this yourself**: Group this yourself
 -   **To your accounts**: Savings, Joint account, Investment account, Other
 
-#### Automatic Tag Assignment
+#### Intelligent Tag Assignment with Priority System
 
--   If a transaction already has a tag, it will be preserved
--   If no tag exists, the system maps category/subcategory combinations to tags
--   Default mappings cover all structured categories with intelligent tag assignment:
-    -   Groceries & household → Groceries
-    -   Transport & travel → Transport
-    -   Restaurants & bars → Dining
-    -   Free time → Entertainment
-    -   Fixed expenses → Housing/Utilities/Other
-    -   Health & Wellness → Health
-    -   Shopping → Shopping
-    -   Other categories → Other
+The system implements a sophisticated priority-based tag assignment system:
+
+**Priority Hierarchy:**
+
+1. **Priority 1: Existing Tag** (Highest) - Preserves user-assigned tags
+2. **Priority 2: Category/Subcategory Mapping** (Medium) - Maps structured data to tags
+3. **Priority 3: Category-Only Mapping** (Low) - Uses category-level mapping
+4. **Priority 4: No Tag** (Lowest) - Leaves tag as null for manual assignment
+
+**Format-Specific Handling:**
+
+-   **CSV Format**: Extracts existing `tag` field first, then maps from `category`/`subcategory`
+-   **JSON Format**: Maps from `category.description` and `subCategory.description` to tags
+-   **Intelligent Detection**: Automatically detects categories from transaction descriptions when missing
+-   **Mixed Data**: Both formats work seamlessly with consistent tag assignment
+-   **Post-Processing**: Tag assignment happens after parsing with comprehensive logging
+
+**Default Mappings:**
+
+-   Groceries & household → Groceries
+-   Transport & travel → Transport
+-   Restaurants & bars → Dining
+-   Free time → Entertainment
+-   Fixed expenses → Housing/Utilities/Other
+-   Health & Wellness → Health
+-   Shopping → Shopping
+-   Other categories → Other
+
+_For detailed implementation, see [TAG_ASSIGNMENT_LOGIC.md](./TAG_ASSIGNMENT_LOGIC.md)_
 
 #### Enhanced Tag Mapping Manager
 
@@ -92,7 +110,25 @@ The system now uses a comprehensive, structured category system with predefined 
 -   **Reset to Defaults**: Reset to default mappings if needed
 -   **Test Functionality**: Built-in test component to verify mappings work correctly
 
-### 4. Enhanced User Interface
+### 4. Consistent Data Table Structure
+
+#### Standardized Column Mapping
+
+The system now uses a standardized column structure that ensures consistent data table rendering regardless of file format:
+
+-   **Core Fields**: id, date, amount, currency, description, type, category, subcategory, tag
+-   **Additional Fields**: account, counterparty, code, debit_credit, transaction_type, notifications, balance
+-   **Null Value Handling**: Missing fields are displayed as null/empty values with graceful fallbacks
+-   **Persistent Data**: All data remains persisted in localStorage with consistent structure
+
+#### Column Mapping Benefits
+
+-   **Consistent UI**: Data table always shows the same columns regardless of source format
+-   **Mixed Data Support**: Can load both CSV and JSON files with unified display
+-   **Graceful Degradation**: Missing fields show as null/empty rather than causing errors
+-   **User Preferences**: Column visibility preferences are preserved across different file formats
+
+### 5. Enhanced User Interface
 
 #### File Upload
 
@@ -141,6 +177,13 @@ The system now uses a comprehensive, structured category system with predefined 
 -   Implements duplicate detection logic
 -   Manages tag mapping system
 -   Provides utility functions for transaction processing
+
+#### `columnMapping.js`
+
+-   Defines standardized column structure for consistent data display
+-   Provides mapping functions for CSV and JSON formats
+-   Handles null value fallbacks for missing fields
+-   Manages column display names and default visibility
 
 ### New Components
 

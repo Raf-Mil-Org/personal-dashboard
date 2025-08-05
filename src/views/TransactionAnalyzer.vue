@@ -1,6 +1,7 @@
 <script setup>
 import { useMultiFormatParser } from '@/composables/useMultiFormatParser';
 import { useTransactionStore } from '@/composables/useTransactionStore';
+import { getColumnDisplayName } from '@/data/columnMapping';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Column from 'primevue/column';
@@ -9,10 +10,13 @@ import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
 import FileUpload from 'primevue/fileupload';
 import SelectButton from 'primevue/selectbutton';
+import Toast from 'primevue/toast';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useToast } from 'primevue/usetoast';
 
 // Composables
 const { parseTransactions, removeDuplicates, parseError } = useMultiFormatParser();
+const toast = useToast();
 const {
     transactions,
     filteredTransactions,
@@ -106,8 +110,24 @@ const onFileSelect = async (event) => {
     }
 };
 
+// Reactive key for DataTable to force re-render when data changes
+const tableKey = ref(0);
+
 const updateTag = (transactionId, tag) => {
+    console.log(`🏷️ TransactionAnalyzer: Updating tag for transaction ${transactionId} to: ${tag}`);
     updateTransactionTag(transactionId, tag);
+    // Force table re-render
+    tableKey.value++;
+
+    // Show success message
+    toast.add({
+        severity: 'success',
+        summary: 'Tag Updated',
+        detail: `Transaction tagged as "${tag}"`,
+        life: 3000
+    });
+
+    console.log(`✅ TransactionAnalyzer: Tag update completed for transaction ${transactionId}`);
 };
 
 const confirmClearData = () => {
@@ -156,27 +176,12 @@ const formatCurrency = (amount) => {
     }).format(amount);
 };
 
-const getColumnDisplayName = (column) => {
-    const displayNames = {
-        Date: 'Date',
-        'Name / Description': 'Description',
-        'Amount (EUR)': 'Amount',
-        Counterparty: 'Counterparty',
-        'Debit/credit': 'Type',
-        'Transaction type': 'Transaction Type',
-        Notifications: 'Notifications',
-        'Resulting balance': 'Balance',
-        Tag: 'Tag',
-        Account: 'Account',
-        Code: 'Code'
-    };
-    return displayNames[column] || column;
-};
+// Using getColumnDisplayName from columnMapping module
 
 const formatFieldValue = (field, value) => {
-    if (field === 'Date') return formatDate(value);
-    if (field === 'Amount (EUR)' || field === 'Amount') return formatAmount(value);
-    if (field === 'Resulting balance') return formatAmount(value);
+    if (field === 'date') return formatDate(value);
+    if (field === 'amount') return formatAmount(value);
+    if (field === 'balance') return formatAmount(value);
     return value;
 };
 
@@ -229,6 +234,7 @@ watch(
 
 <template>
     <div class="transaction-analyzer p-6">
+        <Toast />
         <!-- Header -->
         <div class="mb-6">
             <h1 class="text-3xl font-bold text-gray-900 mb-2">Transaction Analyzer</h1>
@@ -323,6 +329,7 @@ watch(
                 </div>
 
                 <DataTable
+                    :key="`transactions-${tableKey}`"
                     :value="filteredTransactions"
                     :paginator="true"
                     :rows="20"
@@ -333,28 +340,31 @@ watch(
                     stripedRows
                     class="w-full"
                 >
-                    <!-- Dynamic columns based on CSV headers -->
+                    <!-- Dynamic columns based on standard structure -->
                     <Column v-for="column in visibleColumns" :key="column" :field="column" :header="getColumnDisplayName(column)" :sortable="true" class="min-w-[120px]">
                         <template #body="{ data }">
-                            <span v-if="column === 'Amount (EUR)' || column === 'Amount'" class="font-mono">
+                            <span v-if="column === 'amount'" class="font-mono">
                                 {{ formatAmount(data[column]) }}
                             </span>
-                            <span v-else-if="column === 'Date'" class="font-mono">
+                            <span v-else-if="column === 'date'" class="font-mono">
                                 {{ formatDate(data[column]) }}
                             </span>
-                            <span v-else-if="column === 'Name / Description'" class="truncate max-w-[200px] block">
-                                {{ data[column] }}
+                            <span v-else-if="column === 'description'" class="truncate max-w-[200px] block">
+                                {{ data[column] || '-' }}
                             </span>
                             <span v-else class="truncate max-w-[200px] block">
-                                {{ data[column] }}
+                                {{ data[column] || '-' }}
                             </span>
                         </template>
                     </Column>
 
-                    <!-- Tag Column -->
-                    <Column field="tag" header="Category" :sortable="true" class="min-w-[150px]">
+                    <!-- Select Tag Column -->
+                    <Column field="tag" header="Select Tag" :sortable="true" class="min-w-[150px]">
                         <template #body="{ data }">
-                            <Dropdown v-model="data.tag" :options="availableTags" placeholder="Select Category" @change="updateTag(data.id, data.tag)" class="w-full" />
+                            <div class="flex items-center gap-2">
+                                <Dropdown v-model="data.tag" :options="availableTags" placeholder="Select Category" @change="updateTag(data.id, data.tag)" class="w-full" />
+                                <i v-if="data.tag" class="pi pi-check-circle text-green-500" v-tooltip.top="'Tag assigned'"></i>
+                            </div>
                         </template>
                     </Column>
 

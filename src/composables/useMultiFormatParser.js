@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import { useCSVParser } from './useCSVParser';
 import { categories } from '@/data/categories';
+import { mapCSVToStandard, mapJSONToStandard, detectCategoryFromDescription } from '@/data/columnMapping';
 
 export function useMultiFormatParser() {
     const { parseCSV, generateTransactionId } = useCSVParser();
@@ -129,29 +130,36 @@ export function useMultiFormatParser() {
         saveCustomTagMapping(customMapping);
     };
 
-    // Determine tag based on category and subcategory
+    // Determine tag based on category and subcategory with proper priority
     const determineTag = (category, subcategory, existingTag = null) => {
-        // If there's already a tag, prioritize it
+        console.log('🔍 Determining tag for:', { category, subcategory, existingTag });
+        
+        // Priority 1: If there's already a tag, prioritize it
         if (existingTag && existingTag.trim()) {
+            console.log('✅ Using existing tag:', existingTag.trim());
             return existingTag.trim();
         }
 
-        // Try to map from category/subcategory
+        // Priority 2: Try to map from category/subcategory combination
         const tagMapping = getTagMapping();
         
         if (category && subcategory && tagMapping[category] && tagMapping[category][subcategory]) {
-            return tagMapping[category][subcategory];
+            const mappedTag = tagMapping[category][subcategory];
+            console.log('🏷️ Mapped tag from category/subcategory:', mappedTag);
+            return mappedTag;
         }
 
-        // Try to map from just category
+        // Priority 3: Try to map from just category (use first available subcategory)
         if (category && tagMapping[category]) {
-            // Return the first available tag for this category
             const firstSubcategory = Object.keys(tagMapping[category])[0];
             if (firstSubcategory) {
-                return tagMapping[category][firstSubcategory];
+                const mappedTag = tagMapping[category][firstSubcategory];
+                console.log('🏷️ Mapped tag from category only:', mappedTag);
+                return mappedTag;
             }
         }
 
+        console.log('❌ No tag mapping found');
         return null;
     };
 
@@ -185,26 +193,18 @@ export function useMultiFormatParser() {
             }
 
             return data.transactions.map(transaction => {
-                // Extract relevant fields from JSON format
-                const parsedTransaction = {
-                    id: transaction.id || generateTransactionFingerprint(transaction),
-                    date: transaction.executionDate || '',
-                    amount: transaction.amount?.value || '0',
-                    currency: transaction.amount?.currency || 'EUR',
-                    description: transaction.subject || transaction.counterAccount?.name || '',
-                    type: transaction.type?.description || '',
-                    category: transaction.category?.description || '',
-                    subcategory: transaction.subCategory?.description || '',
-                    tag: determineTag(
-                        transaction.category?.description,
-                        transaction.subCategory?.description,
-                        transaction.tag
-                    ),
-                    // Store original data for reference
-                    originalData: transaction
-                };
+                // Map to standard format
+                const standardTransaction = mapJSONToStandard(transaction);
+                
+                // Add generated ID if not present
+                if (!standardTransaction.id) {
+                    standardTransaction.id = generateTransactionFingerprint(transaction);
+                }
+                
+                // Store original data for reference
+                standardTransaction.originalData = transaction;
 
-                return parsedTransaction;
+                return standardTransaction;
             });
         } catch (error) {
             parseError.value = error.message;
@@ -221,21 +221,18 @@ export function useMultiFormatParser() {
             const parsedData = parseCSV(csvText);
             
             return parsedData.map(transaction => {
-                // Generate ID for CSV transactions
-                const id = generateTransactionId(transaction);
+                // Map to standard format
+                const standardTransaction = mapCSVToStandard(transaction);
                 
-                // Try to determine tag from existing tag field or category mapping
-                const tag = determineTag(
-                    transaction.category,
-                    transaction.subcategory,
-                    transaction.tag
-                );
+                // Add generated ID if not present
+                if (!standardTransaction.id) {
+                    standardTransaction.id = generateTransactionId(transaction);
+                }
+                
+                // Store original data for reference
+                standardTransaction.originalData = transaction;
 
-                return {
-                    ...transaction,
-                    id,
-                    tag
-                };
+                return standardTransaction;
             });
         } catch (error) {
             parseError.value = error.message;
@@ -244,18 +241,60 @@ export function useMultiFormatParser() {
         }
     };
 
+    // Post-process transactions to assign tags and categories
+    const postProcessTransactions = (transactions) => {
+        console.log('🔄 Post-processing transactions for tag assignment...');
+        
+        return transactions.map(transaction => {
+            // Clean up tag field (remove # prefix if present)
+            let existingTag = transaction.tag;
+            if (existingTag && existingTag.startsWith('#')) {
+                existingTag = existingTag.substring(1);
+            }
+            
+            // If no category/subcategory detected, try to detect from description
+            if (!transaction.category && !transaction.subcategory && transaction.description) {
+                const detected = detectCategoryFromDescription(transaction.description);
+                transaction.category = detected.category;
+                transaction.subcategory = detected.subcategory;
+                console.log(`🔍 Detected category for "${transaction.description}":`, detected);
+            }
+            
+            // Determine tag with proper priority handling
+            transaction.tag = determineTag(
+                transaction.category,
+                transaction.subcategory,
+                existingTag
+            );
+            
+            console.log(`🏷️ Final tag assignment for "${transaction.description}":`, {
+                existingTag,
+                category: transaction.category,
+                subcategory: transaction.subcategory,
+                finalTag: transaction.tag
+            });
+            
+            return transaction;
+        });
+    };
+
     // Main parsing function that detects format and parses accordingly
     const parseTransactions = (fileContent, fileName) => {
         try {
             parseError.value = null;
 
+            let transactions;
+            
             // Try to detect if it's JSON
             if (fileName.toLowerCase().endsWith('.json') || fileContent.trim().startsWith('{')) {
-                return parseJSONTransactions(fileContent);
+                transactions = parseJSONTransactions(fileContent);
+            } else {
+                // Default to CSV
+                transactions = parseCSVTransactions(fileContent);
             }
             
-            // Default to CSV
-            return parseCSVTransactions(fileContent);
+            // Post-process transactions for tag assignment
+            return postProcessTransactions(transactions);
         } catch (error) {
             parseError.value = error.message;
             console.error('Transaction parsing error:', error);
@@ -333,6 +372,7 @@ export function useMultiFormatParser() {
         parseTransactions,
         parseJSONTransactions,
         parseCSVTransactions,
+        postProcessTransactions,
         removeDuplicates,
         generateTransactionFingerprint,
         determineTag,

@@ -1,5 +1,6 @@
 // composables/useTransactionStore.js
 import { computed, ref, watch } from 'vue';
+import { getAllStandardColumns, DEFAULT_VISIBLE_COLUMNS } from '@/data/columnMapping';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -37,6 +38,12 @@ export function useTransactionStore() {
     // Available tags for dropdown
     const availableTags = ref([...DEFAULT_TAGS]);
 
+    // Watch for changes in transactions and recalculate statistics
+    watch(transactions, () => {
+        console.log('🔄 Transactions changed, recalculating statistics...');
+        calculateStatistics();
+    }, { deep: true });
+
     // Computed properties
     const filteredTransactions = computed(() => {
         if (!transactions.value.length) return [];
@@ -45,13 +52,13 @@ export function useTransactionStore() {
             case 'expenses':
                 return transactions.value.filter((t) => {
                     // Expenses: transactions with 'Debit' value
-                    const debitCredit = t['Debit/credit'] || t['debit/credit'] || t.debitCredit || '';
+                    const debitCredit = t.debit_credit || '';
                     return debitCredit.trim().toLowerCase() === 'debit';
                 });
             case 'income':
                 return transactions.value.filter((t) => {
                     // Income: transactions with 'Credit' value
-                    const debitCredit = t['Debit/credit'] || t['debit/credit'] || t.debitCredit || '';
+                    const debitCredit = t.debit_credit || '';
                     return debitCredit.trim().toLowerCase() === 'credit';
                 });
             default:
@@ -128,6 +135,9 @@ export function useTransactionStore() {
     }
 
     function updateTransactionTag(transactionId, tag) {
+        console.log(`🔄 Updating tag for transaction ${transactionId} to: ${tag}`);
+        
+        // Update tags object
         if (tag) {
             tags.value[transactionId] = tag;
         } else {
@@ -135,10 +145,24 @@ export function useTransactionStore() {
         }
         saveTags();
 
-        // Update the transaction in the list
-        const transaction = transactions.value.find((t) => t.id === transactionId);
-        if (transaction) {
-            transaction.tag = tag;
+        // Update the transaction in the list with proper reactivity
+        const transactionIndex = transactions.value.findIndex((t) => t.id === transactionId);
+        if (transactionIndex !== -1) {
+            // Create a new transaction object to ensure reactivity
+            const updatedTransaction = { ...transactions.value[transactionIndex], tag };
+            transactions.value[transactionIndex] = updatedTransaction;
+            
+            console.log(`✅ Updated transaction at index ${transactionIndex}:`, {
+                id: transactionId,
+                oldTag: transactions.value[transactionIndex].tag,
+                newTag: tag,
+                description: updatedTransaction.description
+            });
+            
+            // Recalculate statistics after tag update
+            calculateStatistics();
+        } else {
+            console.warn(`⚠️ Transaction with ID ${transactionId} not found`);
         }
     }
 
@@ -167,12 +191,12 @@ export function useTransactionStore() {
         let expenses = 0;
 
         transactions.value.forEach((transaction, index) => {
-            // Handle European format amount with comma decimal separator
-            const amountStr = transaction['Amount (EUR)'] || transaction.Amount || transaction.amount || '0';
-            const amount = parseFloat(amountStr.replace(',', '.'));
+            // Handle amount field with standard column name
+            const amountStr = transaction.amount || '0';
+            const amount = parseFloat(amountStr.toString().replace(',', '.'));
 
-            // Use 'Debit/credit' field to determine if it's income or expense
-            const debitCredit = transaction['Debit/credit'] || transaction['debit/credit'] || transaction.debitCredit || '';
+            // Use 'debit_credit' field to determine if it's income or expense
+            const debitCredit = transaction.debit_credit || '';
             const isIncome = debitCredit.trim().toLowerCase() === 'credit';
 
             console.log(`Transaction ${index + 1}:`, {
@@ -181,7 +205,7 @@ export function useTransactionStore() {
                 isNaN: isNaN(amount),
                 debitCredit: debitCredit,
                 isIncome: isIncome,
-                description: transaction['Name / Description'] || transaction.Description || 'No description',
+                description: transaction.description || 'No description',
                 allKeys: Object.keys(transaction)
             });
 
@@ -225,9 +249,9 @@ export function useTransactionStore() {
                 tagStats[tag] = { count: 0, total: 0 };
             }
             tagStats[tag].count++;
-            // Handle European format amount with comma decimal separator
-            const amountStr = transaction['Amount (EUR)'] || transaction.Amount || transaction.amount || '0';
-            const amount = parseFloat(amountStr.replace(',', '.'));
+            // Handle amount field with standard column name
+            const amountStr = transaction.amount || '0';
+            const amount = parseFloat(amountStr.toString().replace(',', '.'));
             tagStats[tag].total += amount;
         });
 
@@ -299,16 +323,12 @@ export function useTransactionStore() {
         console.log('🔄 Setting transactions:', newTransactions.length);
         transactions.value = newTransactions;
 
-        // Extract available columns from the first transaction
-        if (newTransactions.length > 0) {
-            const firstTransaction = newTransactions[0];
-            const columns = Object.keys(firstTransaction).filter((key) => key !== 'id' && key !== 'tag');
-            availableColumns.value = columns;
+        // Use standard columns for consistent data table
+        availableColumns.value = getAllStandardColumns();
 
-            // Set default visible columns if none are set
-            if (visibleColumns.value.length === 0) {
-                visibleColumns.value = [...columns];
-            }
+        // Set default visible columns if none are set
+        if (visibleColumns.value.length === 0) {
+            visibleColumns.value = [...DEFAULT_VISIBLE_COLUMNS];
         }
 
         // Load existing tags for these transactions
@@ -335,21 +355,17 @@ export function useTransactionStore() {
                     console.log(`📊 Found ${data.transactions.length} transactions to load`);
                     transactions.value = data.transactions;
 
-                    // Extract available columns from the first transaction
-                    if (data.transactions.length > 0) {
-                        const firstTransaction = data.transactions[0];
-                        const columns = Object.keys(firstTransaction).filter((key) => key !== 'id' && key !== 'tag');
-                        availableColumns.value = columns;
-                        console.log('📋 Available columns:', columns);
+                    // Use standard columns for consistent data table
+                    availableColumns.value = getAllStandardColumns();
+                    console.log('📋 Available columns:', availableColumns.value);
 
-                        // Only set visible columns if no preferences were loaded
-                        // This preserves user's saved column visibility preferences
-                        if (visibleColumns.value.length === 0) {
-                            visibleColumns.value = [...columns];
-                            console.log('👁️ No saved preferences found, setting all columns visible:', visibleColumns.value);
-                        } else {
-                            console.log('👁️ Preserving saved column preferences:', visibleColumns.value);
-                        }
+                    // Only set visible columns if no preferences were loaded
+                    // This preserves user's saved column visibility preferences
+                    if (visibleColumns.value.length === 0) {
+                        visibleColumns.value = [...DEFAULT_VISIBLE_COLUMNS];
+                        console.log('👁️ No saved preferences found, setting default columns visible:', visibleColumns.value);
+                    } else {
+                        console.log('👁️ Preserving saved column preferences:', visibleColumns.value);
                     }
 
                     // Load existing tags
@@ -414,23 +430,13 @@ export function useTransactionStore() {
             transactions.value = mergedTransactions;
             saveTransactionsToStorage(mergedTransactions);
 
-            // Update available columns if new transactions have different structure
-            if (newUniqueTransactions.length > 0) {
-                const allColumns = new Set();
-                mergedTransactions.forEach((t) => {
-                    Object.keys(t).forEach((key) => {
-                        if (key !== 'id' && key !== 'tag') {
-                            allColumns.add(key);
-                        }
-                    });
-                });
-                availableColumns.value = Array.from(allColumns);
+            // Use standard columns for consistent data table
+            availableColumns.value = getAllStandardColumns();
 
-                // Update visible columns to include new columns
-                const newColumns = availableColumns.value.filter((col) => !visibleColumns.value.includes(col));
-                if (newColumns.length > 0) {
-                    visibleColumns.value = [...visibleColumns.value, ...newColumns];
-                }
+            // Update visible columns to include any new standard columns
+            const newColumns = availableColumns.value.filter((col) => !visibleColumns.value.includes(col));
+            if (newColumns.length > 0) {
+                visibleColumns.value = [...visibleColumns.value, ...newColumns];
             }
 
             console.log(`Added ${newUniqueTransactions.length} new transactions`);

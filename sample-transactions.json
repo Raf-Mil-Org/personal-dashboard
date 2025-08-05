@@ -159,14 +159,36 @@
             ],
             "reservation": false,
             "category": {
-                "code": "NL_R_INC",
-                "description": "Income"
+                "code": "NL_R_OTH",
+                "description": "Other"
             },
             "subCategory": {
-                "code": "NL_R_INC_SAL",
-                "description": "Salary"
+                "code": "NL_R_OTH_SAV",
+                "description": "Savings"
             },
             "searchButtonValue": "Salary payment"
+        },
+        {
+            "id": "010304886692572450000004",
+            "executionDate": "2025-08-03",
+            "amount": {
+                "currency": "EUR",
+                "value": "-12.50"
+            },
+            "type": {
+                "id": "BA",
+                "description": "Payment terminal"
+            },
+            "subject": "Coffee shop",
+            "reservation": true,
+            "category": {
+                "code": "NL_R_RES",
+                "description": "Restaurants & bars"
+            },
+            "subCategory": {
+                "code": "NL_R_RES_COF",
+                "description": "Coffee bars"
+            }
         }
     ]
 } 

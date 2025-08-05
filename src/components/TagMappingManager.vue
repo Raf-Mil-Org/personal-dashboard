@@ -62,6 +62,7 @@
                 <Button @click="exportMappings" label="Export Mappings" severity="success" />
                 <Button @click="importMappings" label="Import Mappings" severity="info" />
                 <Button @click="$router.push('/tag-mapping-test')" label="Test Mappings" severity="warning" />
+                <Button @click="$router.push('/tag-assignment-test')" label="Test Tag Assignment" severity="help" />
             </div>
 
             <!-- Hidden file input for import -->
