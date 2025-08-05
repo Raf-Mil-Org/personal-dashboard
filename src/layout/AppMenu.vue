@@ -9,7 +9,6 @@ const model = ref([
         items: [
             { label: 'Dashboard', icon: 'pi pi-fw pi-home', to: '/' },
             { label: 'Financial Dashboard', icon: 'pi pi-fw pi-home', to: '/financial-dashboard' },
-            { label: 'Financial Dashboard 2', icon: 'pi pi-fw pi-home', to: '/financial-dashboard-2' },
             { label: 'ChatGPT', icon: 'pi pi-fw pi-home', to: '/chat-gpt' },
             { label: 'Demo Functionalities', icon: 'pi pi-fw pi-home', to: '/demo-functionalities' },
             { label: 'Stocks Table', icon: 'pi pi-fw pi-home', to: '/stocks-table' },
@@ -17,7 +16,6 @@ const model = ref([
             { label: 'Visuals Dashboard', icon: 'pi pi-fw pi-home', to: '/visuals-dashboard' },
             { label: 'Customers Overview', icon: 'pi pi-fw pi-home', to: '/customers-overview' },
             { label: 'Task Planner', icon: 'pi pi-fw pi-home', to: '/task-planner' },
-            { label: 'Task Planner 2', icon: 'pi pi-fw pi-home', to: '/task-planner-2' },
             { label: 'Thought Tracker', icon: 'pi pi-fw pi-home', to: '/thought-tracker' },
             { label: 'Motivation', icon: 'pi pi-fw pi-home', to: '/' },
             { label: 'Habits', icon: 'pi pi-fw pi-home', to: '/' },

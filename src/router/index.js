@@ -29,11 +29,6 @@ const router = createRouter({
                     component: () => import('@/views/ChatGPT.vue')
                 },
                 {
-                    path: '/financial-dashboard-2',
-                    name: 'financial-dashboard-2',
-                    component: () => import('@/views/FinancialDashboard2.vue')
-                },
-                {
                     path: '/stocks-table',
                     name: 'stocks-table',
                     component: () => import('@/views/StocksTable.vue')
@@ -48,11 +43,6 @@ const router = createRouter({
                     name: 'journal-dashboard',
                     component: () => import('@/views/JournalDashboard.vue')
                 },
-                // {
-                //     path: '/thoughts',
-                //     name: 'thoughts',
-                //     component: () => import('@/views/Thoughts.vue')
-                // },
                 {
                     path: '/thought-tracker',
                     name: 'thought-tracker',
@@ -68,25 +58,25 @@ const router = createRouter({
                     name: 'health-dashboard',
                     component: () => import('@/views/HealthDashboard.vue')
                 },
-                // {
-                //     path: '/customers-overview',
-                //     name: 'customers-overview',
-                //     component: () => import('@/views/CustomersOverview.vue')
-                // },
                 {
                     path: '/task-planner',
                     name: 'task-planner',
                     component: () => import('@/views/TaskPlanner.vue')
                 },
                 {
-                    path: '/task-planner-2',
-                    name: 'task-planner-2',
-                    component: () => import('@/views/TaskPlanner2.vue')
-                },
-                {
                     path: '/transaction-analyzer',
                     name: 'transaction-analyzer',
                     component: () => import('@/views/TransactionAnalyzer.vue')
+                },
+                {
+                    path: '/tag-mapping-manager',
+                    name: 'tag-mapping-manager',
+                    component: () => import('@/components/TagMappingManager.vue')
+                },
+                {
+                    path: '/tag-mapping-test',
+                    name: 'tag-mapping-test',
+                    component: () => import('@/components/TagMappingTest.vue')
                 },
                 {
                     path: '/uikit/formlayout',

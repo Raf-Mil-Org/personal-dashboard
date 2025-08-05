@@ -1,0 +1,172 @@
+{
+    "transactions": [
+        {
+            "id": "010304886692572450000000",
+            "executionDate": "2025-08-03",
+            "amount": {
+                "currency": "EUR",
+                "value": "-29.27"
+            },
+            "type": {
+                "id": "BA",
+                "description": "Payment terminal"
+            },
+            "iconId": "PAY-BA",
+            "counterAccount": {
+                "name": "Lidl 707 Amsterdam",
+                "accountNumber": {
+                    "type": "UNKNOWN",
+                    "value": ""
+                }
+            },
+            "subject": "Lidl 707 Amsterdam",
+            "subjectLines": [
+                "Lidl 707 Amsterdam AMSTERDAM NLD",
+                "Card sequence no.: 900 03/08/2025 15:39",
+                "Transaction: D00288 Term: KT14XW  ",
+                "Apple Pay"
+            ],
+            "reservation": true,
+            "category": {
+                "code": "NL_R_GRO",
+                "description": "Groceries & household"
+            },
+            "subCategory": {
+                "code": "NL_R_GRO_GRO",
+                "description": "Groceries"
+            },
+            "searchButtonValue": "Lidl 707 Amsterdam",
+            "_links": [
+                {
+                    "rel": "pr_from_transaction",
+                    "href": "/mb/payments/api/payment-requests"
+                },
+                {
+                    "rel": "search",
+                    "href": "/nl/agreements/pSRf7K411x7eVc7huQ-AD5K9r5gUBBTi3X67_HiwC4PA8k9cspL2q08m270UDVSpJ2kVrTIG03xIxHHN0ewaBRD6/transactions/search?currency=EUR&searchTerms=IVAiT9xxKb9kSD5lVkOF0tZlrVHFi3kJK5u1NMtlP4IWWOULWy3UEEHNQqqVYy9_jlxBZeJtEJa9LOf5vIycUkQx&fuzzy=false&wildCard=false&transactionType=BA"
+                },
+                {
+                    "rel": "tag_suggestions",
+                    "href": "/current-accounts/pSRf7K411x7eVc7huQ-AD5K9r5gUBBTi3X67_HiwC4PA8k9cspL2q08m270UDVSpJ2kVrTIG03xIxHHN0ewaBRD6/transactions/enrich/tags"
+                },
+                {
+                    "rel": "transaction_note",
+                    "href": "/current-accounts/pSRf7K411x7eVc7huQ-AD5K9r5gUBBTi3X67_HiwC4PA8k9cspL2q08m270UDVSpJ2kVrTIG03xIxHHN0ewaBRD6/transactions/enrich/63w4Uli_J6eJrI1qqq20HQYBhRa1hD81T8iE8XkfAReWP8I1q5skb6CKqsXcWPmXg5YboRa5bMmX38uOTy5hFBkZHVdI2fsC/note"
+                },
+                {
+                    "rel": "updateTransactionCategory",
+                    "href": "/current-accounts/pSRf7K411x7eVc7huQ-AD5K9r5gUBBTi3X67_HiwC4PA8k9cspL2q08m270UDVSpJ2kVrTIG03xIxHHN0ewaBRD6/categories/NL_R_GRO/transactions/010304886692572450000000"
+                }
+            ]
+        },
+        {
+            "id": "010304886692572450000001",
+            "executionDate": "2025-08-03",
+            "amount": {
+                "currency": "EUR",
+                "value": "-15.50"
+            },
+            "type": {
+                "id": "BA",
+                "description": "Payment terminal"
+            },
+            "iconId": "PAY-BA",
+            "counterAccount": {
+                "name": "McDonald's Amsterdam",
+                "accountNumber": {
+                    "type": "UNKNOWN",
+                    "value": ""
+                }
+            },
+            "subject": "McDonald's Amsterdam",
+            "subjectLines": [
+                "McDonald's Amsterdam AMSTERDAM NLD",
+                "Card sequence no.: 900 03/08/2025 12:15",
+                "Transaction: D00289 Term: KT14XW  ",
+                "Apple Pay"
+            ],
+            "reservation": true,
+            "category": {
+                "code": "NL_R_RES",
+                "description": "Restaurants & bars"
+            },
+            "subCategory": {
+                "code": "NL_R_RES_SNA",
+                "description": "Snacks"
+            },
+            "searchButtonValue": "McDonald's Amsterdam"
+        },
+        {
+            "id": "010304886692572450000002",
+            "executionDate": "2025-08-03",
+            "amount": {
+                "currency": "EUR",
+                "value": "-45.00"
+            },
+            "type": {
+                "id": "BA",
+                "description": "Payment terminal"
+            },
+            "iconId": "PAY-BA",
+            "counterAccount": {
+                "name": "Shell Gas Station",
+                "accountNumber": {
+                    "type": "UNKNOWN",
+                    "value": ""
+                }
+            },
+            "subject": "Shell Gas Station",
+            "subjectLines": [
+                "Shell Gas Station AMSTERDAM NLD",
+                "Card sequence no.: 900 03/08/2025 10:30",
+                "Transaction: D00290 Term: KT14XW  ",
+                "Apple Pay"
+            ],
+            "reservation": true,
+            "category": {
+                "code": "NL_R_TRA",
+                "description": "Transport & travel"
+            },
+            "subCategory": {
+                "code": "NL_R_TRA_GAS",
+                "description": "Fuel"
+            },
+            "searchButtonValue": "Shell Gas Station"
+        },
+        {
+            "id": "010304886692572450000003",
+            "executionDate": "2025-08-03",
+            "amount": {
+                "currency": "EUR",
+                "value": "2500.00"
+            },
+            "type": {
+                "id": "CR",
+                "description": "Credit transfer"
+            },
+            "iconId": "PAY-CR",
+            "counterAccount": {
+                "name": "Employer Corp",
+                "accountNumber": {
+                    "type": "IBAN",
+                    "value": "NL91ABNA0417164300"
+                }
+            },
+            "subject": "Salary payment",
+            "subjectLines": [
+                "Salary payment for August 2025",
+                "Reference: SAL-2025-08"
+            ],
+            "reservation": false,
+            "category": {
+                "code": "NL_R_INC",
+                "description": "Income"
+            },
+            "subCategory": {
+                "code": "NL_R_INC_SAL",
+                "description": "Salary"
+            },
+            "searchButtonValue": "Salary payment"
+        }
+    ]
+} 

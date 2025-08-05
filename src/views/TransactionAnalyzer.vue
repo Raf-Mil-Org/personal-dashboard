@@ -1,5 +1,5 @@
 <script setup>
-import { useCSVParser } from '@/composables/useCSVParser';
+import { useMultiFormatParser } from '@/composables/useMultiFormatParser';
 import { useTransactionStore } from '@/composables/useTransactionStore';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
@@ -12,7 +12,7 @@ import SelectButton from 'primevue/selectbutton';
 import { computed, onMounted, ref, watch } from 'vue';
 
 // Composables
-const { parseCSV, generateTransactionId } = useCSVParser();
+const { parseTransactions, removeDuplicates, parseError } = useMultiFormatParser();
 const {
     transactions,
     filteredTransactions,
@@ -43,6 +43,7 @@ const {
 const showTransactionDialog = ref(false);
 const selectedTransaction = ref(null);
 const showClearDataDialog = ref(false);
+const showDocumentation = ref(false);
 
 // Methods
 const onFileSelect = async (event) => {
@@ -52,23 +53,30 @@ const onFileSelect = async (event) => {
     try {
         isLoading.value = true;
         const text = await file.text();
-        console.log('Raw CSV text:', text.substring(0, 200) + '...');
+        console.log('Raw file text:', text.substring(0, 200) + '...');
 
-        const parsedData = parseCSV(text);
+        // Parse transactions using the multi-format parser
+        const parsedData = parseTransactions(text, file.name);
         console.log('Parsed data (first 2 rows):', parsedData.slice(0, 2));
 
-        // Process transactions with IDs and tags
-        const processedTransactions = parsedData.map((transaction) => ({
+        // Remove duplicates from the parsed data
+        const { unique, duplicateCount } = removeDuplicates(parsedData);
+
+        if (duplicateCount > 0) {
+            console.log(`Found ${duplicateCount} duplicates in uploaded file`);
+        }
+
+        // Process transactions with existing tags
+        const processedTransactions = unique.map((transaction) => ({
             ...transaction,
-            id: generateTransactionId(transaction),
-            tag: loadTags()[generateTransactionId(transaction)] || null
+            tag: loadTags()[transaction.id] || transaction.tag || null
         }));
 
         // Check if we have existing transactions and merge them
         if (transactions.value.length > 0) {
             const result = mergeTransactions(processedTransactions);
 
-            // Show user feedback about the merge (no alert)
+            // Show user feedback about the merge
             console.log(`Upload complete! Added: ${result.added} new transactions, Duplicates skipped: ${result.duplicates}, Total: ${result.total}`);
         } else {
             // First upload - set transactions directly
@@ -86,8 +94,13 @@ const onFileSelect = async (event) => {
         console.log('Successfully processed', processedTransactions.length, 'transactions');
         console.log('First transaction:', processedTransactions[0]);
     } catch (error) {
-        console.error('Error parsing CSV:', error);
-        console.error('Error parsing CSV: ' + error.message);
+        console.error('Error parsing file:', error);
+        console.error('Error parsing file: ' + error.message);
+
+        // Show parse error if available
+        if (parseError.value) {
+            console.error('Parse error details:', parseError.value);
+        }
     } finally {
         isLoading.value = false;
     }
@@ -222,18 +235,29 @@ watch(
             <p class="text-gray-600">Upload and analyze your bank transaction CSV files</p>
         </div>
 
-        <!-- CSV Upload Section -->
+        <!-- File Upload Section -->
         <div class="card mb-6">
-            <h2 class="text-xl font-semibold mb-4">📥 Upload CSV File</h2>
-            <FileUpload :multiple="false" accept=".csv" previewWidth :maxFileSize="10000000" @select="onFileSelect" chooseLabel="Choose CSV File" cancelLabel="Cancel" :auto="true" class="w-full">
+            <h2 class="text-xl font-semibold mb-4">📥 Upload Transaction File</h2>
+            <div class="mb-4">
+                <p class="text-gray-600 mb-2">Supported formats:</p>
+                <ul class="text-sm text-gray-600 list-disc list-inside mb-4">
+                    <li>CSV files (European bank transaction exports)</li>
+                    <li>JSON files (with transaction data structure)</li>
+                </ul>
+            </div>
+            <FileUpload :multiple="false" accept=".csv,.json" previewWidth :maxFileSize="10000000" @select="onFileSelect" chooseLabel="Choose File" cancelLabel="Cancel" :auto="true" class="w-full">
                 <template #empty>
                     <div class="flex flex-col items-center justify-center p-6 text-gray-500">
                         <i class="pi pi-file-excel text-4xl mb-2"></i>
-                        <p>Drag and drop your CSV file here or click to browse</p>
-                        <p class="text-sm mt-1">Supported format: European bank transaction CSV exports (semicolon-delimited)</p>
+                        <p>Drag and drop your transaction file here or click to browse</p>
+                        <p class="text-sm mt-1">Supports CSV and JSON formats</p>
                     </div>
                 </template>
             </FileUpload>
+            <div class="mt-4 flex gap-3">
+                <Button label="Manage Tag Mappings" icon="pi pi-cog" @click="$router.push('/tag-mapping-manager')" size="small" class="bg-blue-500 hover:bg-blue-600" />
+                <Button label="View Documentation" icon="pi pi-info-circle" @click="showDocumentation = true" size="small" class="bg-gray-500 hover:bg-gray-600" />
+            </div>
         </div>
 
         <!-- Summary Statistics -->
@@ -364,6 +388,64 @@ watch(
                 <div class="flex justify-end space-x-2">
                     <Button label="Cancel" @click="showClearDataDialog = false" text />
                     <Button label="Clear All Data" @click="handleClearData" severity="danger" />
+                </div>
+            </template>
+        </Dialog>
+
+        <!-- Documentation Dialog -->
+        <Dialog v-model:visible="showDocumentation" modal header="Transaction Analyzer Documentation" :style="{ width: '800px' }">
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">📁 Supported File Formats</h3>
+                    <div class="space-y-3">
+                        <div class="bg-gray-50 p-3 rounded">
+                            <h4 class="font-medium">CSV Format</h4>
+                            <p class="text-sm text-gray-600">Standard European bank transaction exports with columns like Date, Amount, Description, etc.</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded">
+                            <h4 class="font-medium">JSON Format</h4>
+                            <p class="text-sm text-gray-600">Transaction data with structure including id, executionDate, amount, category, subcategory, etc.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">🏷️ Tag Mapping System</h3>
+                    <p class="text-sm text-gray-600 mb-3">The system automatically assigns tags to transactions based on category and subcategory information:</p>
+                    <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+                        <li>If a transaction already has a tag, it will be preserved</li>
+                        <li>If no tag exists, the system will map category/subcategory combinations to tags</li>
+                        <li>You can customize these mappings in the Tag Mapping Manager</li>
+                        <li>Default mappings cover common categories like Groceries, Transport, Dining, etc.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">🔄 Duplicate Detection</h3>
+                    <p class="text-sm text-gray-600 mb-3">The system automatically detects and prevents duplicate transactions:</p>
+                    <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+                        <li>Uses transaction ID for JSON files</li>
+                        <li>Creates fingerprints from date, amount, and description for CSV files</li>
+                        <li>Duplicates are automatically filtered out during upload</li>
+                        <li>No duplicate transactions are stored in local storage</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">📊 Features</h3>
+                    <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+                        <li>Automatic tag assignment based on category/subcategory</li>
+                        <li>Manual tag editing for individual transactions</li>
+                        <li>Column visibility controls</li>
+                        <li>Filtering by transaction type (income/expense)</li>
+                        <li>Export functionality for tagged data</li>
+                        <li>Statistics and category breakdown</li>
+                    </ul>
+                </div>
+            </div>
+            <template #footer>
+                <div class="flex justify-end">
+                    <Button label="Close" @click="showDocumentation = false" />
                 </div>
             </template>
         </Dialog>
