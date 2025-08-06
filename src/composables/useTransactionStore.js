@@ -32,7 +32,8 @@ export function useTransactionStore() {
     const filterOptions = [
         { label: 'All Transactions', value: 'all' },
         { label: 'Expense Transactions', value: 'expenses' },
-        { label: 'Income Transactions', value: 'income' }
+        { label: 'Income Transactions', value: 'income' },
+        { label: 'Untagged Transactions', value: 'untagged' }
     ];
 
     // Available tags for dropdown
@@ -60,6 +61,10 @@ export function useTransactionStore() {
                     // Income: transactions with 'Credit' value
                     const debitCredit = t.debit_credit || '';
                     return debitCredit.trim().toLowerCase() === 'credit';
+                });
+            case 'untagged':
+                return transactions.value.filter((t) => {
+                    return t.tag === null || t.tag === '';
                 });
             default:
                 return transactions.value;

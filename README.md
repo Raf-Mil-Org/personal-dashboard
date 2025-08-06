@@ -39,8 +39,10 @@ Visit the [documentation](https://sakai.primevue.org/documentation) to get start
 
 This project includes comprehensive documentation for development, troubleshooting, and best practices:
 
+-   **[Frontend Documentation](./FRONTEND_DOCUMENTATION.md)** - Complete guide to the Transaction Analyzer frontend system
+-   **[Tag Assignment Logic](./TAG_ASSIGNMENT_LOGIC.md)** - Detailed explanation of the tag assignment system
+-   **[Transaction Analyzer Enhancements](./TRANSACTION_ANALYZER_ENHANCEMENTS.md)** - Overview of feature enhancements
 -   **[Documentation Index](./docs/README.md)** - Central hub for all project documentation
--   **[Transaction Analyzer Guide](./docs/TRANSACTION_ANALYZER_PROMPT.md)** - Complete implementation guide for the financial transaction analyzer
 -   **[Common Issues](./docs/COMMON_ISSUES.md)** - Troubleshooting guide for known problems and solutions
 -   **[PrimeVue Patterns](./docs/PRIMEVUE_PATTERNS.md)** - Best practices for PrimeVue component usage
 -   **[Documentation Standards](./docs/DOCUMENTATION_STANDARDS.md)** - Guidelines for maintaining documentation
