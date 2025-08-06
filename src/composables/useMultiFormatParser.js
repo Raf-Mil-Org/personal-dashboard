@@ -365,6 +365,19 @@ export function useMultiFormatParser() {
         
         defaultTags.forEach(tag => tags.add(tag));
         
+        // Add custom tags from localStorage
+        try {
+            const savedCustomTags = localStorage.getItem('customTags');
+            if (savedCustomTags) {
+                const customTags = JSON.parse(savedCustomTags);
+                customTags.forEach(customTag => {
+                    tags.add(customTag.name);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading custom tags for available tags:', error);
+        }
+        
         return Array.from(tags).sort();
     };
 

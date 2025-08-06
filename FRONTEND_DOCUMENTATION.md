@@ -101,22 +101,15 @@ const searchFilteredTransactions = computed(() => {
     if (!searchTerm.value.trim()) {
         return filteredTransactions.value;
     }
-    
+
     const searchLower = searchTerm.value.toLowerCase().trim();
-    
-    return filteredTransactions.value.filter(transaction => {
-        const searchableFields = [
-            transaction.description,
-            transaction.tag,
-            transaction.category,
-            transaction.subcategory,
-            transaction.amount,
-            transaction.date,
-            transaction.account,
-            transaction.counterparty
-        ].filter(field => field != null).map(field => field.toString().toLowerCase());
-        
-        return searchableFields.some(field => field.includes(searchLower));
+
+    return filteredTransactions.value.filter((transaction) => {
+        const searchableFields = [transaction.description, transaction.tag, transaction.category, transaction.subcategory, transaction.amount, transaction.date, transaction.account, transaction.counterparty]
+            .filter((field) => field != null)
+            .map((field) => field.toString().toLowerCase());
+
+        return searchableFields.some((field) => field.includes(searchLower));
     });
 });
 ```
@@ -192,12 +185,97 @@ const detectCategoryFromDescription = (description) => {
 -   **Net Amount**: Income minus expenses
 -   **Category Breakdown**: Tag-based transaction grouping
 
+### 7. Tag Component Visualization
+
+#### Color-Coded Tags
+
+The system uses PrimeVue's Tag component with semantic color coding:
+
+-   **Green (Success)**: Groceries, Food, Restaurants, Income, Savings
+-   **Blue (Info)**: Transport, Travel, Insurance, Subscriptions
+-   **Purple (Help)**: Health, Wellness, Medical, Pharmacy
+-   **Orange (Warning)**: Shopping, Clothes, Electronics
+-   **Red (Danger)**: Entertainment, Leisure, Movies, Games
+-   **Gray (Secondary)**: Housing, Utilities, Mortgage
+-   **Blue (Primary)**: Default for other tags
+
+#### Custom Tag Creation
+
+Users can create their own custom tags with personalized colors:
+
+-   **Tag Name Input**: Enter custom tag names (e.g., "Coffee", "Gym", "Books")
+-   **Color Selection**: Choose from 7 predefined color options
+-   **Live Preview**: See how the tag will look before creating it
+-   **Duplicate Prevention**: System prevents duplicate tag names
+-   **Persistent Storage**: Custom tags are saved to localStorage
+-   **Integration**: Custom tags appear in all dropdowns and displays
+
+#### Icon Mapping
+
+Each tag type includes a relevant icon:
+
+-   **Shopping Cart**: Groceries and food
+-   **Car**: Transport and travel
+-   **Heart**: Health and wellness
+-   **Shopping Bag**: Shopping and retail
+-   **Star**: Entertainment and leisure
+-   **Home**: Housing and utilities
+-   **Dollar**: Income and savings
+-   **Shield**: Insurance and subscriptions
+-   **Tag**: Default icon
+
+#### Implementation
+
+```javascript
+// Tag color and icon mapping utility
+export const getTagSeverity = (tag) => {
+    const tagLower = tag.toLowerCase();
+
+    if (tagLower.includes('grocery') || tagLower.includes('food')) {
+        return 'success';
+    }
+    if (tagLower.includes('transport') || tagLower.includes('travel')) {
+        return 'info';
+    }
+    // ... more mappings
+    return 'primary';
+};
+```
+
+#### Usage in Components
+
+```vue
+<Tag :value="getTagValue(tag)" :severity="getTagSeverity(tag, customTags)" :icon="getTagIcon(tag)" />
+```
+
+#### Custom Tag Management
+
+```javascript
+// Add custom tag
+const addCustomTag = () => {
+    const newTag = {
+        name: tagName,
+        color: selectedColor,
+        createdAt: new Date().toISOString()
+    };
+    customTags.value.push(newTag);
+    saveCustomTags();
+};
+
+// Remove custom tag
+const removeCustomTag = (tagName) => {
+    customTags.value = customTags.value.filter((tag) => tag.name !== tagName);
+    saveCustomTags();
+};
+```
+
 #### Interactive Data Table
 
 -   **Column Visibility**: Users can show/hide columns
 -   **Sorting**: All columns are sortable
 -   **Filtering**: Filter by transaction type (income/expense)
 -   **Search**: Global keyword search across multiple fields
+-   **Tag Visualization**: Color-coded PrimeVue Tag components with icons
 -   **Pagination**: Configurable rows per page
 
 ## 🔧 Technical Implementation
@@ -317,6 +395,7 @@ const postProcessTransactions = (transactions) => {
 -   Sortable columns
 -   Transaction type filtering
 -   Global keyword search
+-   Color-coded tag visualization
 -   Pagination controls
 -   Inline tag editing
 

@@ -2,6 +2,7 @@
 import { useMultiFormatParser } from '@/composables/useMultiFormatParser';
 import { useTransactionStore } from '@/composables/useTransactionStore';
 import { getColumnDisplayName } from '@/data/columnMapping';
+import { getTagSeverity, getTagValue, getTagIcon } from '@/utils/tagColors';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Column from 'primevue/column';
@@ -11,6 +12,7 @@ import Dropdown from 'primevue/dropdown';
 import FileUpload from 'primevue/fileupload';
 import InputText from 'primevue/inputtext';
 import SelectButton from 'primevue/selectbutton';
+import Tag from 'primevue/tag';
 import Toast from 'primevue/toast';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
@@ -33,6 +35,7 @@ const {
     loadColumnPreferences,
     saveColumnPreferences,
     loadTags,
+    loadCustomTags,
     updateTransactionTag,
     getTagStatistics,
     exportTaggedData,
@@ -50,6 +53,7 @@ const selectedTransaction = ref(null);
 const showClearDataDialog = ref(false);
 const showDocumentation = ref(false);
 const searchTerm = ref(''); // Search term for filtering transactions
+const customTags = ref([]); // Custom tags for color mapping
 
 // Methods
 const onFileSelect = async (event) => {
@@ -135,6 +139,19 @@ const updateTag = (transactionId, tag) => {
 const clearSearch = () => {
     searchTerm.value = '';
     console.log('🔍 Search cleared');
+};
+
+const loadCustomTagsForColors = () => {
+    try {
+        const saved = localStorage.getItem('customTags');
+        if (saved) {
+            customTags.value = JSON.parse(saved);
+            console.log('✅ Loaded custom tags for colors:', customTags.value.length);
+        }
+    } catch (error) {
+        console.error('Error loading custom tags for colors:', error);
+        customTags.value = [];
+    }
 };
 
 const confirmClearData = () => {
@@ -223,6 +240,12 @@ onMounted(() => {
 
     loadColumnPreferences();
     console.log('Column preferences loaded');
+
+    // Load custom tags for color mapping
+    loadCustomTagsForColors();
+
+    // Load custom tags into available tags dropdown
+    loadCustomTags();
 
     // Try to load saved transactions from localStorage
     const hasSavedData = loadSavedTransactions();
@@ -390,6 +413,10 @@ watch(
                             <span v-else-if="column === 'date'" class="font-mono">
                                 {{ formatDate(data[column]) }}
                             </span>
+                            <span v-else-if="column === 'tag'" class="flex items-center gap-2">
+                                <Tag v-if="data[column]" :value="getTagValue(data[column])" :severity="getTagSeverity(data[column], customTags)" :icon="getTagIcon(data[column])" />
+                                <span v-else class="text-gray-400 text-sm">No tag</span>
+                            </span>
                             <span v-else-if="column === 'description'" class="truncate max-w-[200px] block">
                                 {{ data[column] || '-' }}
                             </span>
@@ -403,8 +430,11 @@ watch(
                     <Column field="tag" header="Select Tag" :sortable="true" class="min-w-[150px]">
                         <template #body="{ data }">
                             <div class="flex items-center gap-2">
-                                <Dropdown v-model="data.tag" :options="availableTags" placeholder="Select Category" @change="updateTag(data.id, data.tag)" class="w-full" />
-                                <i v-if="data.tag" class="pi pi-check-circle text-green-500" v-tooltip.top="'Tag assigned'"></i>
+                                <!-- <div class="flex-1">
+                                    <Tag v-if="data.tag" :value="getTagValue(data.tag)" :severity="getTagSeverity(data.tag)" :icon="getTagIcon(data.tag)" class="cursor-pointer" @click="showTagDropdown(data)" />
+                                    <span v-else class="text-gray-400 text-sm">No tag</span>
+                                </div> -->
+                                <Dropdown v-model="data.tag" :options="availableTags" placeholder="Select Category" @change="updateTag(data.id, data.tag)" class="w-32" />
                             </div>
                         </template>
                     </Column>
@@ -424,7 +454,11 @@ watch(
             <div v-if="selectedTransaction" class="space-y-4">
                 <div v-for="(value, key) in selectedTransaction" :key="key" class="flex justify-between">
                     <span class="font-medium text-gray-700">{{ getColumnDisplayName(key) }}:</span>
-                    <span class="text-gray-900">{{ formatFieldValue(key, value) }}</span>
+                    <span v-if="key === 'tag'" class="text-gray-900">
+                        <Tag v-if="value" :value="getTagValue(value)" :severity="getTagSeverity(value, customTags)" :icon="getTagIcon(value)" />
+                        <span v-else class="text-gray-400">No tag assigned</span>
+                    </span>
+                    <span v-else class="text-gray-900">{{ formatFieldValue(key, value) }}</span>
                 </div>
             </div>
         </Dialog>

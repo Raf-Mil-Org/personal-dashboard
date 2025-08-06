@@ -39,6 +39,28 @@ export function useTransactionStore() {
     // Available tags for dropdown
     const availableTags = ref([...DEFAULT_TAGS]);
 
+    // Load custom tags and update available tags
+    function loadCustomTags() {
+        try {
+            const saved = localStorage.getItem('customTags');
+            if (saved) {
+                const customTags = JSON.parse(saved);
+                const customTagNames = customTags.map(tag => tag.name);
+                
+                // Add custom tags to available tags if not already present
+                customTagNames.forEach(tagName => {
+                    if (!availableTags.value.includes(tagName)) {
+                        availableTags.value.push(tagName);
+                    }
+                });
+                
+                console.log('✅ Loaded custom tags into available tags:', customTagNames);
+            }
+        } catch (error) {
+            console.error('Error loading custom tags:', error);
+        }
+    }
+
     // Watch for changes in transactions and recalculate statistics
     watch(transactions, () => {
         console.log('🔄 Transactions changed, recalculating statistics...');
@@ -377,6 +399,14 @@ export function useTransactionStore() {
                     loadTags();
                     console.log('🏷️ Tags loaded');
 
+                    // Apply saved tags to transactions
+                    const savedTags = tags.value;
+                    transactions.value = transactions.value.map(transaction => ({
+                        ...transaction,
+                        tag: savedTags[transaction.id] || transaction.tag || null
+                    }));
+                    console.log('🏷️ Applied saved tags to transactions');
+
                     // Calculate statistics
                     calculateStatistics();
 
@@ -547,6 +577,9 @@ export function useTransactionStore() {
         { deep: true }
     );
 
+    // Initialize custom tags when store is created
+    loadCustomTags();
+
     return {
         // State
         transactions,
@@ -574,6 +607,7 @@ export function useTransactionStore() {
         saveColumnPreferences,
         loadTags,
         saveTags,
+        loadCustomTags,
         updateTransactionTag,
         addCustomTag,
         removeCustomTag,
