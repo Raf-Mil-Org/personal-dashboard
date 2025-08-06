@@ -17,7 +17,7 @@ const model = ref([
             { label: 'Task Planner', icon: 'pi pi-fw pi-home', to: '/task-planner' },
             { label: 'Thought Tracker', icon: 'pi pi-fw pi-home', to: '/thought-tracker' },
             { label: 'Motivation', icon: 'pi pi-fw pi-home', to: '/' },
-            { label: 'Habits', icon: 'pi pi-fw pi-home', to: '/' },
+            // { label: 'Habits', icon: 'pi pi-fw pi-home', to: '/' },
             { label: 'Photo Uploader', icon: 'pi pi-fw pi-home', to: '/photo-uploader' },
             { label: 'Health', icon: 'pi pi-fw pi-home', to: '/health-dashboard' },
             { label: 'Journals', icon: 'pi pi-fw pi-home', to: '/journal-dashboard' }

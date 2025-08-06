@@ -346,7 +346,7 @@ watch(
                 <h3 class="text-lg font-semibold mb-4">📊 Transaction Data</h3>
 
                 <!-- Search and Filter Controls -->
-                <div class="flex flex-col gap-4 mb-4">
+                <div class="flex flex-col md:flex-row gap-4 mb-4">
                     <div class="flex items-center gap-3">
                         <SelectButton v-model="selectedFilter" :options="filterOptions" optionLabel="label" optionValue="value" />
                         <Button v-if="searchTerm" @click="clearSearch" icon="pi pi-times" text size="small" v-tooltip.top="'Clear search'" />
