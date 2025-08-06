@@ -84,6 +84,56 @@ src/
 -   Creates fingerprints from date, amount, and description
 -   Generates unique transaction IDs for tracking
 
+### 3. Global Search Functionality
+
+#### Search Features
+
+-   **Multi-field Search**: Searches across description, tag, category, subcategory, amount, date, account, and counterparty
+-   **Case-insensitive**: Search is not case-sensitive for better user experience
+-   **Real-time Filtering**: Results update as you type
+-   **Clear Search**: Easy-to-use clear button when search is active
+-   **Search Statistics**: Shows filtered vs total transaction counts
+
+#### Implementation
+
+```javascript
+const searchFilteredTransactions = computed(() => {
+    if (!searchTerm.value.trim()) {
+        return filteredTransactions.value;
+    }
+    
+    const searchLower = searchTerm.value.toLowerCase().trim();
+    
+    return filteredTransactions.value.filter(transaction => {
+        const searchableFields = [
+            transaction.description,
+            transaction.tag,
+            transaction.category,
+            transaction.subcategory,
+            transaction.amount,
+            transaction.date,
+            transaction.account,
+            transaction.counterparty
+        ].filter(field => field != null).map(field => field.toString().toLowerCase());
+        
+        return searchableFields.some(field => field.includes(searchLower));
+    });
+});
+```
+
+#### User Interface
+
+```vue
+<span class="p-input-icon-left w-full">
+    <i class="pi pi-search" />
+    <InputText 
+        v-model="searchTerm" 
+        placeholder="Search transactions by description, tag, category, amount, date..." 
+        class="w-full"
+    />
+</span>
+```
+
 #### Implementation
 
 ```javascript
@@ -93,7 +143,7 @@ const generateTransactionFingerprint = (transaction) => {
 };
 ```
 
-### 3. Advanced Tag Assignment System
+### 4. Advanced Tag Assignment System
 
 #### Priority-Based Assignment
 
@@ -117,7 +167,7 @@ const detectCategoryFromDescription = (description) => {
 };
 ```
 
-### 4. Interactive Tag Management
+### 5. Interactive Tag Management
 
 #### Real-Time Tag Updates
 
@@ -133,7 +183,7 @@ const detectCategoryFromDescription = (description) => {
 -   **Export/Import**: Mappings can be exported and imported as JSON
 -   **Reset Functionality**: Option to reset to default mappings
 
-### 5. Data Visualization & Statistics
+### 6. Data Visualization & Statistics
 
 #### Summary Statistics
 
@@ -147,6 +197,7 @@ const detectCategoryFromDescription = (description) => {
 -   **Column Visibility**: Users can show/hide columns
 -   **Sorting**: All columns are sortable
 -   **Filtering**: Filter by transaction type (income/expense)
+-   **Search**: Global keyword search across multiple fields
 -   **Pagination**: Configurable rows per page
 
 ## 🔧 Technical Implementation
@@ -265,6 +316,7 @@ const postProcessTransactions = (transactions) => {
 -   Configurable column visibility
 -   Sortable columns
 -   Transaction type filtering
+-   Global keyword search
 -   Pagination controls
 -   Inline tag editing
 

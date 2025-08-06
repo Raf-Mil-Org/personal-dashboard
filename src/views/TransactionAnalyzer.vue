@@ -9,6 +9,7 @@ import DataTable from 'primevue/datatable';
 import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
 import FileUpload from 'primevue/fileupload';
+import InputText from 'primevue/inputtext';
 import SelectButton from 'primevue/selectbutton';
 import Toast from 'primevue/toast';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -48,6 +49,7 @@ const showTransactionDialog = ref(false);
 const selectedTransaction = ref(null);
 const showClearDataDialog = ref(false);
 const showDocumentation = ref(false);
+const searchTerm = ref(''); // Search term for filtering transactions
 
 // Methods
 const onFileSelect = async (event) => {
@@ -130,6 +132,11 @@ const updateTag = (transactionId, tag) => {
     console.log(`✅ TransactionAnalyzer: Tag update completed for transaction ${transactionId}`);
 };
 
+const clearSearch = () => {
+    searchTerm.value = '';
+    console.log('🔍 Search cleared');
+};
+
 const confirmClearData = () => {
     showClearDataDialog.value = true;
 };
@@ -187,6 +194,24 @@ const formatFieldValue = (field, value) => {
 
 // Computed properties for statistics
 const totalTransactions = computed(() => filteredTransactions.value.length);
+
+// Computed property for search-filtered transactions
+const searchFilteredTransactions = computed(() => {
+    if (!searchTerm.value.trim()) {
+        return filteredTransactions.value;
+    }
+
+    const searchLower = searchTerm.value.toLowerCase().trim();
+
+    return filteredTransactions.value.filter((transaction) => {
+        // Search in multiple fields
+        const searchableFields = [transaction.description, transaction.tag, transaction.category, transaction.subcategory, transaction.amount, transaction.date, transaction.account, transaction.counterparty]
+            .filter((field) => field != null)
+            .map((field) => field.toString().toLowerCase());
+
+        return searchableFields.some((field) => field.includes(searchLower));
+    });
+});
 
 const tagStatistics = computed(() => {
     return getTagStatistics();
@@ -319,9 +344,25 @@ watch(
             <!-- Data Table -->
             <div class="card">
                 <h3 class="text-lg font-semibold mb-4">📊 Transaction Data</h3>
-                <SelectButton v-model="selectedFilter" :options="filterOptions" optionLabel="label" optionValue="value" class="w-full md:w-auto" />
-                <div class="mb-4 mt-3 flex justify-between items-center">
-                    <div class="text-sm text-gray-600">Showing {{ filteredTransactions.length }} of {{ transactions.length }} transactions</div>
+
+                <!-- Search and Filter Controls -->
+                <div class="flex flex-col gap-4 mb-4">
+                    <div class="flex items-center gap-3">
+                        <SelectButton v-model="selectedFilter" :options="filterOptions" optionLabel="label" optionValue="value" />
+                        <Button v-if="searchTerm" @click="clearSearch" icon="pi pi-times" text size="small" v-tooltip.top="'Clear search'" />
+                    </div>
+                    <div class="flex justify-end">
+                        <IconField>
+                            <InputIcon>
+                                <i class="pi pi-search" />
+                            </InputIcon>
+                            <InputText v-model="searchTerm" placeholder="Keyword Search" />
+                        </IconField>
+                    </div>
+                </div>
+
+                <div class="mb-4 flex justify-between items-center">
+                    <div class="text-sm text-gray-600">Showing {{ searchFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)</div>
                     <div class="flex items-center gap-3">
                         <Button label="Export Tagged Data" icon="pi pi-download" @click="exportTaggedData" size="small" />
                         <Button label="Clear All Data" icon="pi pi-trash" severity="danger" size="small" @click="confirmClearData" v-tooltip.top="'This will remove all transactions and settings'" />
@@ -330,7 +371,7 @@ watch(
 
                 <DataTable
                     :key="`transactions-${tableKey}`"
-                    :value="filteredTransactions"
+                    :value="searchFilteredTransactions"
                     :paginator="true"
                     :rows="20"
                     :rowsPerPageOptions="[10, 20, 50, 100]"
