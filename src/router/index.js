@@ -84,6 +84,11 @@ const router = createRouter({
                     component: () => import('@/components/TagAssignmentTest.vue')
                 },
                 {
+                    path: '/monthly-reports',
+                    name: 'monthly-reports',
+                    component: () => import('@/views/MonthlyReports.vue')
+                },
+                {
                     path: '/uikit/formlayout',
                     name: 'formlayout',
                     component: () => import('@/views/uikit/FormLayout.vue')

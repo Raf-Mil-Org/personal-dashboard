@@ -3,6 +3,7 @@ import { useMultiFormatParser } from '@/composables/useMultiFormatParser';
 import { useTransactionStore } from '@/composables/useTransactionStore';
 import { getColumnDisplayName } from '@/data/columnMapping';
 import { getTagSeverity, getTagValue, getTagIcon } from '@/utils/tagColors';
+import { formatAmountWithType } from '@/utils/transactionTypeDetermination';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Column from 'primevue/column';
@@ -187,10 +188,16 @@ const formatAmount = (amount) => {
     const cleanAmount = amount.toString().replace(',', '.');
     const num = parseFloat(cleanAmount);
     if (isNaN(num)) return amount;
-    return new Intl.NumberFormat('en-US', {
+
+    // Format with sign (+ for positive, - for negative)
+    const sign = num >= 0 ? '+' : '';
+    const absoluteValue = Math.abs(num);
+    const formattedValue = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'EUR'
-    }).format(num);
+    }).format(absoluteValue);
+
+    return `${sign}${formattedValue}`;
 };
 
 const formatCurrency = (amount) => {
@@ -407,8 +414,8 @@ watch(
                     <!-- Dynamic columns based on standard structure -->
                     <Column v-for="column in visibleColumns" :key="column" :field="column" :header="getColumnDisplayName(column)" :sortable="true" class="min-w-[120px]">
                         <template #body="{ data }">
-                            <span v-if="column === 'amount'" class="font-mono">
-                                {{ formatAmount(data[column]) }}
+                            <span v-if="column === 'amount'" class="font-mono" :class="formatAmountWithType(data[column], data).colorClass">
+                                {{ formatAmountWithType(data[column], data).formatted }}
                             </span>
                             <span v-else-if="column === 'date'" class="font-mono">
                                 {{ formatDate(data[column]) }}
