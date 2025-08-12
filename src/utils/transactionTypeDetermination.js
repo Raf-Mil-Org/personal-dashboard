@@ -140,7 +140,7 @@ export function formatAmountWithType(amount, transaction) {
     }).format(absoluteValue);
     
     const formatted = `${sign}${formattedValue}`;
-    const colorClass = transactionType.isIncome ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
+    const colorClass = transactionType.isIncome ? 'text-green-600 font-semibold' : 'text-black-600 font-semibold';
     
     return { formatted, colorClass, transactionType };
 }

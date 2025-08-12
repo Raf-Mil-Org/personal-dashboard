@@ -103,7 +103,12 @@ export const mapJSONToStandard = (jsonTransaction) => {
         account: jsonTransaction.account || null,
         counterparty: jsonTransaction.counterparty || null,
         code: jsonTransaction.code || null,
-        debit_credit: jsonTransaction.debit_credit || null,
+        debit_credit: (() => {
+            const amount = jsonTransaction.amount?.value || jsonTransaction.amount;
+            if (!amount) return null;
+            const numAmount = parseFloat(amount);
+            return isNaN(numAmount) ? null : (numAmount < 0 ? 'debit' : 'credit');
+        })(),
         transaction_type: jsonTransaction.transaction_type || null,
         notifications: jsonTransaction.notifications || null,
         balance: jsonTransaction.balance || null

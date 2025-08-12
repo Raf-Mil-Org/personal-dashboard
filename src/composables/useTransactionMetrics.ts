@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 import { useUtils } from './useUtils';
+import { parseCurrency, addAmounts, formatCurrency } from '@/utils/currencyUtils';
 
 const categorizedCompanies = [
     { name: 'ALBERT HEIJN 1598 AMSTERDAM NLD', category: { name: 'Groceries & household', key: 'groceries_household' } },
@@ -298,9 +299,15 @@ export function useTransactionMetrics(tableDataRef) {
 
     const expenseCategories = ref(JSON.parse(localStorage.getItem('expenseCategories')) || defaultExpenseCategories.value);
 
-    const totalExpenses = computed(() => tableDataRef.value.filter((item) => item.counterparty === '').reduce((sum, item) => sum + item.amount, 0));
+    const totalExpenses = computed(() => {
+        const expenses = tableDataRef.value.filter((item) => item.counterparty === '');
+        return addAmounts(...expenses.map(item => item.amount));
+    });
 
-    const totalIncome = computed(() => tableDataRef.value.filter((item) => item.counterparty !== '').reduce((sum, item) => sum + item.amount, 0));
+    const totalIncome = computed(() => {
+        const income = tableDataRef.value.filter((item) => item.counterparty !== '');
+        return addAmounts(...income.map(item => item.amount));
+    });
 
     const netBalance = computed(() => totalIncome.value - totalExpenses.value);
 
@@ -325,9 +332,9 @@ export function useTransactionMetrics(tableDataRef) {
                 const month = parseInt(date.slice(4, 6), 10) - 1;
 
                 if (year === 2024) {
-                    const amount = parseFloat(item['amount']);
-                    if (!isNaN(amount)) {
-                        expensesByMonth[month] += amount;
+                    const amount = parseCurrency(item['amount']);
+                    if (amount !== 0) {
+                        expensesByMonth[month] = addAmounts(expensesByMonth[month], amount);
                     }
                 }
             }
@@ -342,7 +349,8 @@ export function useTransactionMetrics(tableDataRef) {
             .filter((item) => item.counterparty !== '')
             .forEach((item) => {
                 const month = new Date(item.date).getMonth();
-                incomeByMonth[month] += item.amount;
+                const amount = parseCurrency(item.amount);
+                incomeByMonth[month] = addAmounts(incomeByMonth[month], amount);
             });
         return incomeByMonth;
     });
@@ -354,7 +362,8 @@ export function useTransactionMetrics(tableDataRef) {
             .forEach((item) => {
                 const key = item.category?.key || 'other';
                 if (!categoryExpenses[key]) categoryExpenses[key] = 0;
-                categoryExpenses[key] += item.amount;
+                const amount = parseCurrency(item.amount);
+                categoryExpenses[key] = addAmounts(categoryExpenses[key], amount);
             });
         return categoryExpenses;
     });
@@ -376,12 +385,12 @@ export function useTransactionMetrics(tableDataRef) {
 
                 if (year === 2024) {
                     // Filter only for the target year
-                    const amount = parseFloat(item['Amount (EUR)']);
+                    const amount = parseCurrency(item['Amount (EUR)']);
                     const categoryKey = item.category?.key || 'other'; // Default to 'other' if category is missing
 
-                    if (!isNaN(amount)) {
+                    if (amount !== 0) {
                         try {
-                            categoryExpenses[categoryKey][month] += amount;
+                            categoryExpenses[categoryKey][month] = addAmounts(categoryExpenses[categoryKey][month], amount);
                         } catch (error) {
                             console.log(categoryKey);
                             console.log(month);
