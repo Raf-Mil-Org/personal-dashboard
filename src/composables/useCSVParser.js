@@ -117,21 +117,37 @@ export function useCSVParser() {
 
     /**
      * Generate a unique, consistent ID for a transaction
-     * Uses Date + Amount + Description to create a hash
+     * Uses Date + Amount + Description to create a deterministic hash
+     * This ensures the same transaction always gets the same ID
      */
     function generateTransactionId(transaction) {
-        const date = transaction.Date || transaction.date || '';
-        const amount = transaction.Amount || transaction.amount || '';
-        const description = transaction.Description || transaction.description || transaction.Memo || transaction.memo || '';
+        const date = transaction.Date || transaction.date || transaction.executionDate || '';
+        const amount = transaction.Amount || transaction.amount || (transaction.amount?.value || '');
+        const description = transaction.Description || transaction.description || transaction.subject || transaction.Memo || transaction.memo || '';
 
-        // Create a consistent string for hashing
-        const hashString = `${date}-${amount}-${description}`;
+        // Create a normalized string for consistent hashing
+        let normalizedDate = date.toString().trim();
+        
+        // Normalize date format: convert YYYYMMDD to YYYY-MM-DD
+        if (normalizedDate.match(/^\d{8}$/)) {
+            // Format: YYYYMMDD -> YYYY-MM-DD
+            const year = normalizedDate.substring(0, 4);
+            const month = normalizedDate.substring(4, 6);
+            const day = normalizedDate.substring(6, 8);
+            normalizedDate = `${year}-${month}-${day}`;
+        }
+        // Normalize amount: replace comma with period for European decimal format
+        const normalizedAmount = amount.toString().trim().replace(',', '.');
+        const normalizedDescription = description.toString().trim().toLowerCase();
 
-        // Generate a simple hash (base64 encoding of the string)
+        const hashString = `${normalizedDate}-${normalizedAmount}-${normalizedDescription}`;
+
+        // Generate a deterministic hash (base64 encoding of the string)
         const hash = btoa(hashString)
             .replace(/[^a-zA-Z0-9]/g, '') // Remove special characters
-            .slice(0, 12); // Limit to 12 characters
+            .slice(0, 16); // Limit to 16 characters for better uniqueness
 
+        // Ensure we always return a valid ID
         return hash || `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
 

@@ -45,7 +45,8 @@ const {
     mergeTransactions,
     saveLastUploadInfo,
     getLastUploadInfo,
-    clearAllData
+    clearAllData,
+    debugCheckDuplicates
 } = useTransactionStore();
 
 // Local state
@@ -55,6 +56,15 @@ const showClearDataDialog = ref(false);
 const showDocumentation = ref(false);
 const searchTerm = ref(''); // Search term for filtering transactions
 const customTags = ref([]); // Custom tags for color mapping
+
+const kal2 = computed(() => {
+    const mak = ['500.00', '250.00', '21.00', '1000.00', '508.00', '500.00', '5043.45'];
+    let sum = 0;
+    mak.forEach((amount) => {
+        sum += parseFloat(amount);
+    });
+    return sum * 2;
+});
 
 // Methods
 const onFileSelect = async (event) => {
@@ -77,7 +87,7 @@ const onFileSelect = async (event) => {
             console.log(`Found ${duplicateCount} duplicates in uploaded file`);
         }
 
-        // Process transactions with existing tags
+        // Process transactions with existing tags using transaction IDs (now deterministic)
         const processedTransactions = unique.map((transaction) => ({
             ...transaction,
             tag: loadTags()[transaction.id] || transaction.tag || null
@@ -394,11 +404,15 @@ watch(
                 <div class="mb-4 flex justify-between items-center">
                     <div class="text-sm text-gray-600">Showing {{ searchFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)</div>
                     <div class="flex items-center gap-3">
+                        <Button label="Debug Duplicates" icon="pi pi-search" @click="debugCheckDuplicates" size="small" v-tooltip.top="'Check for duplicates in current transactions'" />
                         <Button label="Export Tagged Data" icon="pi pi-download" @click="exportTaggedData" size="small" />
                         <Button label="Clear All Data" icon="pi pi-trash" severity="danger" size="small" @click="confirmClearData" v-tooltip.top="'This will remove all transactions and settings'" />
                     </div>
                 </div>
 
+                <!-- <p>{{ JSON.stringify(transactions) }}</p> -->
+                <p>{{ kal2 }}</p>
+                <p>{{ transactions.filter((transaction) => transaction.debit_credit === 'credit').map((transaction) => transaction.amount) }}</p>
                 <DataTable
                     :key="`transactions-${tableKey}`"
                     :value="searchFilteredTransactions"

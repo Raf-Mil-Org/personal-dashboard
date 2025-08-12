@@ -1,6 +1,5 @@
 import { ref } from 'vue';
 import { useCSVParser } from './useCSVParser';
-import { categories } from '@/data/categories';
 import { mapCSVToStandard, mapJSONToStandard, detectCategoryFromDescription } from '@/data/columnMapping';
 
 export function useMultiFormatParser() {
@@ -165,20 +164,37 @@ export function useMultiFormatParser() {
 
     // Generate a unique fingerprint for duplicate detection
     const generateTransactionFingerprint = (transaction) => {
-        // For JSON format
-        if (transaction.id) {
-            return transaction.id;
+        // Always use the actual transaction data for fingerprinting, not the ID
+        // This ensures duplicates are detected even if they have different IDs
+        // Use lowercase field names as they are in the mapped transaction object
+        const date = transaction.date || transaction.Date || transaction.executionDate || '';
+        const amount = transaction.amount || transaction.Amount || (transaction.amount?.value || '');
+        const description = transaction.description || transaction.Description || transaction.subject || '';
+
+        // Create a normalized fingerprint based on key transaction data
+        let normalizedDate = date.toString().trim();
+        
+        // Normalize date format: convert YYYYMMDD to YYYY-MM-DD
+        if (normalizedDate.match(/^\d{8}$/)) {
+            // Format: YYYYMMDD -> YYYY-MM-DD
+            const year = normalizedDate.substring(0, 4);
+            const month = normalizedDate.substring(4, 6);
+            const day = normalizedDate.substring(6, 8);
+            normalizedDate = `${year}-${month}-${day}`;
         }
+        // Normalize amount: replace comma with period for European decimal format
+        const normalizedAmount = amount.toString().trim().replace(',', '.');
+        const normalizedDescription = description.toString().trim().toLowerCase();
 
-        // For CSV format or fallback
-        const date = transaction.Date || transaction.date || transaction.executionDate || '';
-        const amount = transaction.Amount || transaction.amount || (transaction.amount?.value || '');
-        const description = transaction.Description || transaction.description || transaction.subject || '';
+        const hashString = `${normalizedDate}-${normalizedAmount}-${normalizedDescription}`;
+        
+        // Create a more robust hash that's consistent across different data sources
+        const hash = btoa(hashString)
+            
 
-        const hashString = `${date}-${amount}-${description}`;
-        return btoa(hashString)
-            .replace(/[^a-zA-Z0-9]/g, '')
-            .slice(0, 12);
+        console.log('🔍 HASHES:');
+        console.log('🔍 hash:', hash);
+        return hash;
     };
 
     // Parse JSON transaction format
@@ -192,14 +208,27 @@ export function useMultiFormatParser() {
                 throw new Error('Invalid JSON format: missing or invalid "transactions" array');
             }
 
-            return data.transactions.map(transaction => {
+            console.log('🔍 JSON parsing - Total transactions in array:', data.transactions.length);
+            
+            return data.transactions.map((transaction, index) => {
+                // Debug: Log transaction details
+                if (index < 5 || transaction.amount?.value === '7822.45' || transaction.amount?.value === '8548.11') {
+                    console.log(`🔍 JSON Transaction ${index + 1}:`, {
+                        id: transaction.id,
+                        date: transaction.executionDate,
+                        amount: transaction.amount?.value,
+                        description: transaction.subject,
+                        hasAmount: !!transaction.amount,
+                        hasValue: !!transaction.amount?.value
+                    });
+                }
+                
                 // Map to standard format
                 const standardTransaction = mapJSONToStandard(transaction);
                 
-                // Add generated ID if not present
-                if (!standardTransaction.id) {
-                    standardTransaction.id = generateTransactionFingerprint(transaction);
-                }
+                // Always generate a deterministic ID for consistency
+                // This ensures the same transaction always gets the same ID
+                standardTransaction.id = generateTransactionId(transaction);
                 
                 // Store original data for reference
                 standardTransaction.originalData = transaction;
@@ -219,21 +248,25 @@ export function useMultiFormatParser() {
             parseError.value = null;
             
             const parsedData = parseCSV(csvText);
+
             
-            return parsedData.map(transaction => {
+            const transactions = parsedData.map(transaction => {
                 // Map to standard format
                 const standardTransaction = mapCSVToStandard(transaction);
                 
-                // Add generated ID if not present
-                if (!standardTransaction.id) {
-                    standardTransaction.id = generateTransactionId(transaction);
-                }
+                // Always generate a deterministic ID for consistency
+                // This ensures the same transaction always gets the same ID
+                standardTransaction.id = generateTransactionId(standardTransaction);
                 
                 // Store original data for reference
                 standardTransaction.originalData = transaction;
 
                 return standardTransaction;
             });
+            
+
+            
+            return transactions;
         } catch (error) {
             parseError.value = error.message;
             console.error('CSV parsing error:', error);
@@ -293,8 +326,11 @@ export function useMultiFormatParser() {
                 transactions = parseCSVTransactions(fileContent);
             }
             
+            // Remove duplicates within the parsed transactions
+            const { unique: deduplicatedTransactions } = removeDuplicates(transactions);
+            
             // Post-process transactions for tag assignment
-            return postProcessTransactions(transactions);
+            return postProcessTransactions(deduplicatedTransactions);
         } catch (error) {
             parseError.value = error.message;
             console.error('Transaction parsing error:', error);
@@ -304,20 +340,42 @@ export function useMultiFormatParser() {
 
     // Remove duplicates from transactions
     const removeDuplicates = (transactions) => {
-        const seen = new Set();
+        const seen = new Map(); // Use Map to store fingerprint -> first occurrence
         const unique = [];
         const duplicates = [];
 
-        transactions.forEach(transaction => {
+        console.log(`🔍 Checking ${transactions.length} transactions for duplicates...`);
+
+        transactions.forEach((transaction, index) => {
             const fingerprint = generateTransactionFingerprint(transaction);
             
+
+            
             if (seen.has(fingerprint)) {
+                const originalTransaction = seen.get(fingerprint);
+                console.log(`🚨 Duplicate found at index ${index}:`, {
+                    original: {
+                        date: originalTransaction.Date || originalTransaction.date,
+                        amount: originalTransaction.Amount || originalTransaction.amount,
+                        description: originalTransaction.Description || originalTransaction.description,
+                        id: originalTransaction.id
+                    },
+                    duplicate: {
+                        date: transaction.Date || transaction.date,
+                        amount: transaction.Amount || transaction.amount,
+                        description: transaction.Description || transaction.description,
+                        id: transaction.id
+                    },
+                    fingerprint
+                });
                 duplicates.push(transaction);
             } else {
-                seen.add(fingerprint);
+                seen.set(fingerprint, transaction);
                 unique.push(transaction);
             }
         });
+
+        console.log(`✅ Duplicate detection complete: ${unique.length} unique, ${duplicates.length} duplicates`);
 
         return {
             unique,

@@ -164,7 +164,7 @@ export function useTransactionStore() {
     function updateTransactionTag(transactionId, tag) {
         console.log(`🔄 Updating tag for transaction ${transactionId} to: ${tag}`);
         
-        // Update tags object
+        // Update tags object using transaction ID as key (now deterministic)
         if (tag) {
             tags.value[transactionId] = tag;
         } else {
@@ -213,6 +213,7 @@ export function useTransactionStore() {
 
     function calculateStatistics() {
         console.log('📊 Calculating statistics for', transactions.value.length, 'transactions');
+        console.log('📊 Transaction IDs in array:', transactions.value.map(t => t.id).slice(0, 10)); // Show first 10 IDs
 
         let income = 0;
         let expenses = 0;
@@ -244,6 +245,7 @@ export function useTransactionStore() {
             if (isIncome) {
                 income += Math.abs(amount); // Use absolute value for consistency
                 console.log(`  → Added to income: ${Math.abs(amount)} (Total income now: ${income})`);
+                console.log(`  → INCOME TRANSACTION: ${transaction.description} | Amount: ${amountStr} | Debit/Credit: ${debitCredit}`);
             } else {
                 expenses += Math.abs(amount); // Use absolute value for consistency
                 console.log(`  → Added to expenses: ${Math.abs(amount)} (Total expenses now: ${expenses})`);
@@ -346,6 +348,34 @@ export function useTransactionStore() {
         localStorage.removeItem(STORAGE_KEYS.LAST_UPLOAD);
     }
 
+    // Debug function to check for duplicates in current transactions
+    function debugCheckDuplicates() {
+        console.log('🔍 Debug: Checking for duplicates in current transactions...');
+        const ids = new Map();
+        const duplicates = [];
+        
+        transactions.value.forEach((transaction, index) => {
+            if (ids.has(transaction.id)) {
+                const original = ids.get(transaction.id);
+                duplicates.push({
+                    original: { index: original.index, transaction: original.transaction },
+                    duplicate: { index, transaction },
+                    id: transaction.id
+                });
+            } else {
+                ids.set(transaction.id, { index, transaction });
+            }
+        });
+        
+        if (duplicates.length > 0) {
+            console.log(`🚨 Found ${duplicates.length} duplicate pairs:`, duplicates);
+        } else {
+            console.log('✅ No duplicates found in current transactions');
+        }
+        
+        return duplicates;
+    }
+
     function setTransactions(newTransactions) {
         console.log('🔄 Setting transactions:', newTransactions.length);
         transactions.value = newTransactions;
@@ -399,13 +429,13 @@ export function useTransactionStore() {
                     loadTags();
                     console.log('🏷️ Tags loaded');
 
-                    // Apply saved tags to transactions
+                    // Apply saved tags to transactions using transaction IDs (now deterministic)
                     const savedTags = tags.value;
                     transactions.value = transactions.value.map(transaction => ({
                         ...transaction,
                         tag: savedTags[transaction.id] || transaction.tag || null
                     }));
-                    console.log('🏷️ Applied saved tags to transactions');
+                    console.log('🏷️ Applied saved tags to transactions using transaction IDs');
 
                     // Calculate statistics
                     calculateStatistics();
@@ -451,13 +481,37 @@ export function useTransactionStore() {
 
     function mergeTransactions(newTransactions) {
         const existingTransactions = transactions.value;
-        const existingIds = new Set(existingTransactions.map((t) => t.id));
+        
+        console.log(`🔄 Merging ${newTransactions.length} new transactions with ${existingTransactions.length} existing transactions`);
+        
+        // Use transaction IDs for duplicate detection since they are now deterministic
+        const existingIds = new Set(existingTransactions.map(t => t.id));
+        
+        console.log(`📋 Found ${existingIds.size} existing transaction IDs`);
 
-        const newUniqueTransactions = newTransactions.filter((t) => !existingIds.has(t.id));
-        const duplicates = newTransactions.filter((t) => existingIds.has(t.id));
+        // Filter out duplicates based on transaction IDs
+        const newUniqueTransactions = [];
+        const duplicates = [];
+        
+
+        
+        newTransactions.forEach((t, index) => {
+            if (existingIds.has(t.id)) {
+                console.log(`🚨 Duplicate found at index ${index}:`, {
+                    id: t.id,
+                    date: t.Date || t.date,
+                    amount: t.Amount || t.amount,
+                    description: t.Description || t.description
+                });
+                duplicates.push(t);
+            } else {
+                newUniqueTransactions.push(t);
+                existingIds.add(t.id); // Add to set to prevent duplicates within newTransactions
+            }
+        });
 
         if (duplicates.length > 0) {
-            console.log(`Found ${duplicates.length} duplicate transactions, skipping them`);
+            console.log(`🚨 Found ${duplicates.length} duplicate transactions, skipping them`);
         }
 
         if (newUniqueTransactions.length > 0) {
@@ -474,10 +528,12 @@ export function useTransactionStore() {
                 visibleColumns.value = [...visibleColumns.value, ...newColumns];
             }
 
-            console.log(`Added ${newUniqueTransactions.length} new transactions`);
+            console.log(`✅ Added ${newUniqueTransactions.length} new transactions`);
 
             // Calculate statistics after merging
             calculateStatistics();
+
+            console.log(`📊 Merge complete: ${newUniqueTransactions.length} added, ${duplicates.length} duplicates, ${mergedTransactions.length} total`);
 
             return {
                 added: newUniqueTransactions.length,
@@ -486,6 +542,7 @@ export function useTransactionStore() {
             };
         }
 
+        console.log(`📊 Merge complete: 0 added, ${duplicates.length} duplicates, ${existingTransactions.length} total`);
         return {
             added: 0,
             duplicates: duplicates.length,
@@ -616,6 +673,7 @@ export function useTransactionStore() {
         getTagStatistics,
         exportTaggedData,
         clearAllData,
+        debugCheckDuplicates,
 
         // API stubs
         saveColumnPreferencesToBackend,

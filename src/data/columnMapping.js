@@ -67,14 +67,61 @@ export const DEFAULT_VISIBLE_COLUMNS = [
     'tag'
 ];
 
+// Helper function to normalize transaction descriptions for consistency
+const normalizeDescription = (description) => {
+    if (!description) return null;
+    
+    // Normalize Revolut descriptions to be consistent
+    if (description.includes('Revolut**7355*')) {
+        return 'Revolut**7355*';
+    }
+    
+    return description;
+};
+
 // Column mapping functions for different formats
 export const mapCSVToStandard = (csvTransaction) => {
+    // Handle amount with proper sign based on debit/credit field
+    let amount = csvTransaction['Amount (EUR)'] || csvTransaction.Amount || csvTransaction.amount || null;
+    const debitCredit = csvTransaction['Debit/credit'] || csvTransaction.debit_credit || null;
+    
+    if (amount && debitCredit) {
+        // Normalize amount: replace comma with period for European decimal format
+        const normalizedAmount = amount.toString().trim().replace(',', '.');
+        const numAmount = parseFloat(normalizedAmount);
+        
+        if (!isNaN(numAmount)) {
+            // Apply sign based on debit/credit field
+            if (debitCredit.toLowerCase() === 'debit') {
+                amount = (-numAmount).toString();
+            } else if (debitCredit.toLowerCase() === 'credit') {
+                amount = numAmount.toString();
+            }
+        }
+    }
+    
+    // Normalize date format: convert YYYYMMDD to YYYY-MM-DD
+    let normalizedDate = csvTransaction.Date || csvTransaction.date || null;
+    if (normalizedDate && normalizedDate.toString().match(/^\d{8}$/)) {
+        // Format: YYYYMMDD -> YYYY-MM-DD
+        const year = normalizedDate.substring(0, 4);
+        const month = normalizedDate.substring(4, 6);
+        const day = normalizedDate.substring(6, 8);
+        normalizedDate = `${year}-${month}-${day}`;
+    }
+    
+    // Normalize description
+    const rawDescription = csvTransaction['Name / Description'] || csvTransaction.Description || csvTransaction.description || null;
+    const normalizedDescription = normalizeDescription(rawDescription);
+    
+
+    
     return {
         id: csvTransaction.id || null,
-        date: csvTransaction.Date || csvTransaction.date || null,
-        amount: csvTransaction['Amount (EUR)'] || csvTransaction.Amount || csvTransaction.amount || null,
+        date: normalizedDate,
+        amount: amount,
         currency: csvTransaction.currency || 'EUR',
-        description: csvTransaction['Name / Description'] || csvTransaction.Description || csvTransaction.description || null,
+        description: normalizedDescription,
         type: csvTransaction.type || null,
         category: csvTransaction.category || null,
         subcategory: csvTransaction.subcategory || null,
@@ -82,7 +129,7 @@ export const mapCSVToStandard = (csvTransaction) => {
         account: csvTransaction.Account || csvTransaction.account || null,
         counterparty: csvTransaction.Counterparty || csvTransaction.counterparty || null,
         code: csvTransaction.Code || csvTransaction.code || null,
-        debit_credit: csvTransaction['Debit/credit'] || csvTransaction.debit_credit || null,
+        debit_credit: debitCredit,
         transaction_type: csvTransaction['Transaction type'] || csvTransaction.transaction_type || null,
         notifications: csvTransaction.Notifications || csvTransaction.notifications || null,
         balance: csvTransaction['Resulting balance'] || csvTransaction.balance || null
@@ -90,12 +137,18 @@ export const mapCSVToStandard = (csvTransaction) => {
 };
 
 export const mapJSONToStandard = (jsonTransaction) => {
+    // Normalize description
+    const rawDescription = jsonTransaction.subject || jsonTransaction.counterAccount?.name || jsonTransaction.description || null;
+    const normalizedDescription = normalizeDescription(rawDescription);
+    
+
+    
     return {
         id: jsonTransaction.id || null,
         date: jsonTransaction.executionDate || jsonTransaction.date || null,
         amount: jsonTransaction.amount?.value || jsonTransaction.amount || null,
         currency: jsonTransaction.amount?.currency || jsonTransaction.currency || 'EUR',
-        description: jsonTransaction.subject || jsonTransaction.counterAccount?.name || jsonTransaction.description || null,
+        description: normalizedDescription,
         type: jsonTransaction.type?.description || jsonTransaction.type || null,
         category: jsonTransaction.category?.description || jsonTransaction.category || null,
         subcategory: jsonTransaction.subCategory?.description || jsonTransaction.subcategory || null,
