@@ -57,13 +57,38 @@ const showDocumentation = ref(false);
 const searchTerm = ref(''); // Search term for filtering transactions
 const customTags = ref([]); // Custom tags for color mapping
 
-const kal2 = computed(() => {
-    const mak = ['500.00', '250.00', '21.00', '1000.00', '508.00', '500.00', '5043.45'];
+const netAmount2 = computed(() => {
+    return incomes.value - expenses.value;
+});
+
+const transactionsNumber = computed(() => {
+    return searchFilteredTransactions.value.length;
+});
+
+const expenses = computed(() => {
     let sum = 0;
-    mak.forEach((amount) => {
-        sum += parseFloat(amount);
+    const temp = searchFilteredTransactions.value.filter((transaction) => transaction.debit_credit === 'debit').map((transaction) => transaction.amount);
+    temp.forEach((amount) => {
+        const amount2 = amount.replace('-', '');
+        sum += parseFloat(amount2);
     });
-    return sum * 2;
+    return sum;
+});
+
+const incomes = computed(() => {
+    let sum = 0;
+    const temp = searchFilteredTransactions.value.filter((transaction) => transaction.debit_credit === 'credit').map((transaction) => transaction.amount);
+    temp.forEach((amount) => {
+        const amount2 = amount.replace('-', '');
+        sum += parseFloat(amount2);
+    });
+
+    // const kalerer = searchFilteredTransactions.value.find((transaction) => transaction.description === 'ABN AMRO BANK');
+    const kalerer = searchFilteredTransactions.value.findIndex((transaction) => transaction.description === 'ABN AMRO BANK');
+    console.log(kalerer);
+    console.log(kalerer);
+    const previousBalance = searchFilteredTransactions.value[kalerer];
+    return previousBalance;
 });
 
 // Methods
@@ -336,19 +361,19 @@ watch(
             <h3 class="text-lg font-semibold mb-4">📈 Summary Statistics</h3>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-blue-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-blue-600">{{ totalTransactions }}</div>
+                    <div class="text-2xl font-bold text-blue-600">{{ transactionsNumber }}</div>
                     <div class="text-sm text-blue-800">Total Transactions</div>
                 </div>
                 <div class="bg-green-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-green-600">{{ formatCurrency(totalIncome) }}</div>
+                    <div class="text-2xl font-bold text-green-600">{{ formatCurrency(incomes) }}</div>
                     <div class="text-sm text-green-800">Total Income</div>
                 </div>
                 <div class="bg-red-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-red-600">{{ formatCurrency(totalExpenses) }}</div>
+                    <div class="text-2xl font-bold text-red-600">{{ formatCurrency(expenses) }}</div>
                     <div class="text-sm text-red-800">Total Expenses</div>
                 </div>
                 <div class="bg-purple-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(netAmount) }}</div>
+                    <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(netAmount2) }}</div>
                     <div class="text-sm text-purple-800">Net Amount</div>
                 </div>
             </div>
@@ -411,8 +436,9 @@ watch(
                 </div>
 
                 <!-- <p>{{ JSON.stringify(transactions) }}</p> -->
-                <p>{{ kal2 }}</p>
-                <p>{{ transactions.filter((transaction) => transaction.debit_credit === 'credit').map((transaction) => transaction.amount) }}</p>
+                <p>Expenses: {{ expenses }}</p>
+                <p>Incomes: {{ incomes }}</p>
+                <!-- <p>{{ searchFilteredTransactions.filter((transaction) => transaction.debit_credit === 'debit').map((transaction) => transaction.amount) }}</p> -->
                 <DataTable
                     :key="`transactions-${tableKey}`"
                     :value="searchFilteredTransactions"
