@@ -88,7 +88,7 @@ const incomes = computed(() => {
     console.log(kalerer);
     console.log(kalerer);
     const previousBalance = searchFilteredTransactions.value[kalerer];
-    return previousBalance;
+    // return previousBalance;
     return sum;
 });
 
