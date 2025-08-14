@@ -15,17 +15,17 @@ import Chart from 'primevue/chart';
 // Store
 const { transactions, loadSavedTransactions } = useTransactionStore();
 
+const availablePeriods = computed(() => {
+    return getAvailablePeriods();
+});
+
 // Reactive data
-const selectedPeriod = ref(null);
+const selectedPeriod = ref(availablePeriods.value[1]);
 const currentPeriodStats = ref(null);
 const periodComparison = ref(null);
 
 // Computed properties
 const hasTransactions = computed(() => transactions.value.length > 0);
-
-const availablePeriods = computed(() => {
-    return getAvailablePeriods();
-});
 
 // Set default period when periods are available
 watch(
