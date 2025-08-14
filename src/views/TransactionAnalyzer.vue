@@ -5,6 +5,7 @@ import { getColumnDisplayName } from '@/data/columnMapping';
 import { formatCentsAsEuro, centsToEuroString } from '@/utils/currencyUtils';
 import { getTagSeverity, getTagValue, getTagIcon } from '@/utils/tagColors';
 import { formatAmountWithType } from '@/utils/transactionTypeDetermination';
+import SavingsInvestmentDashboard from '@/components/SavingsInvestmentDashboard.vue';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Column from 'primevue/column';
@@ -34,7 +35,11 @@ const {
     isLoading,
     totalIncome,
     totalExpenses,
+    totalSavings,
+    totalInvestments,
+    totalTransfers,
     netAmount,
+    savingsRate,
     loadColumnPreferences,
     saveColumnPreferences,
     loadTags,
@@ -50,7 +55,10 @@ const {
     clearAllData,
     debugCheckDuplicates,
     getPersistentCounts,
-    resetPersistentCounts
+    resetPersistentCounts,
+    applySavingsInvestmentsDetection,
+    getDetectionStatistics,
+    manuallyOverrideTransaction
 } = useTransactionStore();
 
 // Local state
@@ -70,6 +78,9 @@ const jsonTransactions = ref([]);
 const csvTransactions = ref([]);
 const hasJsonUploaded = ref(false);
 const hasCsvUploaded = ref(false);
+
+// Dashboard state
+const showSavingsDashboard = ref(false);
 
 // Methods
 const onFileSelect = async (event) => {
@@ -369,6 +380,11 @@ const persistentCounts = computed(() => {
     return getPersistentCounts();
 });
 
+// Detection statistics display
+const detectionStats = computed(() => {
+    return getDetectionStatistics();
+});
+
 // Lifecycle
 onMounted(() => {
     console.log('TransactionAnalyzer mounted - starting to load data...');
@@ -464,13 +480,30 @@ watch(
                 <Button label="View Documentation" icon="pi pi-info-circle" @click="showDocumentation = true" size="small" class="bg-gray-500 hover:bg-gray-600" />
                 <Button label="Log Persistent Counts" icon="pi pi-chart-bar" @click="() => console.log('📊 Persistent Counts:', getPersistentCounts())" size="small" class="bg-yellow-500 hover:bg-yellow-600" />
                 <Button label="Reset Persistent Counts" icon="pi pi-refresh" @click="resetPersistentCounts" size="small" class="bg-red-500 hover:bg-red-600" />
+                <Button label="Auto-Detect Savings/Investments" icon="pi pi-search" @click="applySavingsInvestmentsDetection" size="small" class="bg-green-500 hover:bg-green-600" />
+                <Button label="Show Detection Stats" icon="pi pi-info-circle" @click="() => console.log('🔍 Detection Stats:', detectionStats)" size="small" class="bg-blue-500 hover:bg-blue-600" />
+                <Button
+                    :label="showSavingsDashboard ? 'Hide Savings Dashboard' : 'Show Savings Dashboard'"
+                    :icon="showSavingsDashboard ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                    @click="showSavingsDashboard = !showSavingsDashboard"
+                    size="small"
+                    class="bg-indigo-500 hover:bg-indigo-600"
+                />
+                <Button
+                    label="Manual Override Demo"
+                    icon="pi pi-edit"
+                    @click="() => manuallyOverrideTransaction(transactions[0]?.id, 'Savings', 'Demo override')"
+                    size="small"
+                    class="bg-orange-500 hover:bg-orange-600"
+                    :disabled="!transactions.length"
+                />
             </div>
         </div>
 
         <!-- Summary Statistics -->
         <div class="card">
             <h3 class="text-lg font-semibold mb-4">📈 Summary Statistics</h3>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="bg-blue-50 p-4 rounded-lg">
                     <div class="text-2xl font-bold text-blue-600">{{ transactions.length }}</div>
                     <div class="text-sm text-blue-800">Total Transactions</div>
@@ -486,6 +519,26 @@ watch(
                 <div class="bg-purple-50 p-4 rounded-lg">
                     <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(netAmount) }}</div>
                     <div class="text-sm text-purple-800">Net Amount</div>
+                </div>
+            </div>
+
+            <!-- Savings and Investments Row -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                <div class="bg-emerald-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-emerald-600">{{ formatCurrency(totalSavings) }}</div>
+                    <div class="text-sm text-emerald-800">Total Savings</div>
+                </div>
+                <div class="bg-amber-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-amber-600">{{ formatCurrency(totalInvestments) }}</div>
+                    <div class="text-sm text-amber-800">Total Investments</div>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-slate-600">{{ formatCurrency(totalTransfers) }}</div>
+                    <div class="text-sm text-slate-800">Total Transfers</div>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-600">{{ savingsRate.toFixed(1) }}%</div>
+                    <div class="text-sm text-purple-800">Savings Rate</div>
                 </div>
             </div>
         </div>
@@ -508,6 +561,57 @@ watch(
                 </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">These counts persist across data clearing and track unique transactions processed</p>
+        </div>
+
+        <!-- Detection Statistics -->
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-4">🔍 Detection Statistics</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <div class="text-lg font-bold text-blue-600">{{ detectionStats.total }}</div>
+                    <div class="text-xs text-blue-800">Total</div>
+                </div>
+                <div class="bg-green-50 p-3 rounded-lg">
+                    <div class="text-lg font-bold text-green-600">{{ detectionStats.income }}</div>
+                    <div class="text-xs text-green-800">Income</div>
+                </div>
+                <div class="bg-red-50 p-3 rounded-lg">
+                    <div class="text-lg font-bold text-red-600">{{ detectionStats.expenses }}</div>
+                    <div class="text-xs text-red-800">Expenses</div>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-lg">
+                    <div class="text-lg font-bold text-emerald-600">{{ detectionStats.savings }}</div>
+                    <div class="text-xs text-emerald-800">Savings</div>
+                </div>
+                <div class="bg-amber-50 p-3 rounded-lg">
+                    <div class="text-lg font-bold text-amber-600">{{ detectionStats.investments }}</div>
+                    <div class="text-xs text-amber-800">Investments</div>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-lg">
+                    <div class="text-lg font-bold text-slate-600">{{ detectionStats.transfers }}</div>
+                    <div class="text-xs text-slate-800">Transfers</div>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-lg">
+                    <div class="text-lg font-bold text-gray-600">{{ detectionStats.untagged }}</div>
+                    <div class="text-xs text-gray-800">Untagged</div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Current categorization breakdown of all transactions</p>
+        </div>
+
+        <!-- Savings & Investment Dashboard -->
+        <div v-if="showSavingsDashboard" class="card">
+            <SavingsInvestmentDashboard
+                :total-income="totalIncome"
+                :total-expenses="totalExpenses"
+                :total-savings="totalSavings"
+                :total-investments="totalInvestments"
+                :net-amount="netAmount"
+                :savings-rate="savingsRate"
+                @auto-detect="applySavingsInvestmentsDetection"
+                @export-report="() => console.log('Export report clicked')"
+                @detailed-analysis="() => console.log('Detailed analysis clicked')"
+            />
         </div>
 
         <!-- Tag Statistics -->

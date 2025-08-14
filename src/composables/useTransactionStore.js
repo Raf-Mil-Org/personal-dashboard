@@ -19,7 +19,7 @@ const PERSISTENT_STORAGE_KEYS = {
 };
 
 // Predefined tags
-const DEFAULT_TAGS = ['Groceries', 'Utilities', 'Dining', 'Transport', 'Health', 'Entertainment', 'Subscriptions', 'Housing', 'Other'];
+const DEFAULT_TAGS = ['Groceries', 'Utilities', 'Dining', 'Transport', 'Health', 'Entertainment', 'Subscriptions', 'Housing', 'Savings', 'Investments', 'Transfers', 'Other'];
 
 export function useTransactionStore() {
     // State
@@ -33,7 +33,11 @@ export function useTransactionStore() {
     // Statistics state
     const totalIncome = ref(0);
     const totalExpenses = ref(0);
+    const totalSavings = ref(0);
+    const totalInvestments = ref(0);
+    const totalTransfers = ref(0);
     const netAmount = ref(0);
+    const savingsRate = ref(0);
 
     // Filter options
     const filterOptions = [
@@ -82,6 +86,242 @@ export function useTransactionStore() {
         const counts = getPersistentCounts();
         console.log('📊 Persistent Transaction Counts:', counts);
         return counts;
+    }
+
+    // Enhanced detection configuration
+    const DETECTION_CONFIG = {
+        // Investment keywords and patterns
+        investments: {
+            keywords: ['investment', 'invest', 'stock', 'crypto', 'bitcoin', 'ethereum', 'trading', 'portfolio', 'broker', 'degiro', 'trading212', 'etoro', 'coinbase', 'binance', 'mutual fund', 'etf', 'index fund', 'dividend', 'securities', 'bonds'],
+            accountPatterns: [/degiro/i, /trading212/i, /etoro/i, /coinbase/i, /binance/i, /kraken/i, /interactive brokers/i, /fidelity/i, /vanguard/i, /schwab/i],
+            subcategories: ['investment', 'investment account', 'stock market', 'crypto', 'etf', 'mutual funds']
+        },
+        // Savings keywords and patterns
+        savings: {
+            keywords: ['savings', 'save', 'emergency fund', 'goal savings', 'deposit', 'contribution', 'reserve', 'nest egg', 'rainy day fund'],
+            accountPatterns: [/bunq/i, /savings account/i, /emergency fund/i, /goal savings/i],
+            subcategories: ['savings account', 'emergency fund', 'goal savings']
+        },
+        // Transfer keywords and patterns
+        transfers: {
+            keywords: ['transfer', 'internal transfer', 'account transfer', 'between accounts', 'own transfer', 'self transfer', 'move money'],
+            accountPatterns: [/transfer to own account/i, /internal transfer/i, /between own accounts/i],
+            subcategories: ['internal transfer', 'account transfer', 'between accounts']
+        }
+    };
+
+    // Function to detect savings and investments based on enhanced rules
+    function detectSavingsAndInvestments(transaction) {
+        const tag = (transaction.tag || '').toLowerCase();
+
+        // Check if already tagged correctly
+        if (tag === 'investments' || tag === 'savings' || tag === 'transfers') {
+            return tag.charAt(0).toUpperCase() + tag.slice(1); // Capitalize first letter
+        }
+
+        // Investment detection (highest priority)
+        if (detectInvestment(transaction)) {
+            return 'Investments';
+        }
+
+        // Savings detection
+        if (detectSavings(transaction)) {
+            return 'Savings';
+        }
+
+        // Transfer detection
+        if (detectTransfer(transaction)) {
+            return 'Transfers';
+        }
+
+        return null; // No automatic detection
+    }
+
+    // Helper function to detect investments
+    function detectInvestment(transaction) {
+        const description = (transaction.description || '').toLowerCase();
+        const subcategory = (transaction.subcategory || '').toLowerCase();
+        const counterparty = (transaction.counterparty || '').toLowerCase();
+
+        // Check subcategory first
+        if (DETECTION_CONFIG.investments.subcategories.includes(subcategory)) {
+            return true;
+        }
+
+        // Check keywords in description
+        if (DETECTION_CONFIG.investments.keywords.some((keyword) => description.includes(keyword))) {
+            return true;
+        }
+
+        // Check account patterns
+        if (DETECTION_CONFIG.investments.accountPatterns.some((pattern) => pattern.test(description) || pattern.test(counterparty))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Helper function to detect savings
+    function detectSavings(transaction) {
+        const description = (transaction.description || '').toLowerCase();
+        const subcategory = (transaction.subcategory || '').toLowerCase();
+        const counterparty = (transaction.counterparty || '').toLowerCase();
+
+        // Check subcategory first
+        if (DETECTION_CONFIG.savings.subcategories.includes(subcategory)) {
+            return true;
+        }
+
+        // Check keywords in description
+        if (DETECTION_CONFIG.savings.keywords.some((keyword) => description.includes(keyword))) {
+            return true;
+        }
+
+        // Check account patterns
+        if (DETECTION_CONFIG.savings.accountPatterns.some((pattern) => pattern.test(description) || pattern.test(counterparty))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Helper function to detect transfers
+    function detectTransfer(transaction) {
+        const description = (transaction.description || '').toLowerCase();
+        const subcategory = (transaction.subcategory || '').toLowerCase();
+        const counterparty = (transaction.counterparty || '').toLowerCase();
+
+        // Check subcategory first
+        if (DETECTION_CONFIG.transfers.subcategories.includes(subcategory)) {
+            return true;
+        }
+
+        // Check keywords in description
+        if (DETECTION_CONFIG.transfers.keywords.some((keyword) => description.includes(keyword))) {
+            return true;
+        }
+
+        // Check account patterns
+        if (DETECTION_CONFIG.transfers.accountPatterns.some((pattern) => pattern.test(description) || pattern.test(counterparty))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Function to apply automatic savings/investments detection to transactions
+    function applySavingsInvestmentsDetection() {
+        let updatedCount = 0;
+        let investmentsCount = 0;
+        let savingsCount = 0;
+        let transfersCount = 0;
+
+        console.log('🔍 Starting enhanced savings/investments detection...');
+
+        transactions.value.forEach((transaction) => {
+            const detectedType = detectSavingsAndInvestments(transaction);
+            if (detectedType && (!transaction.tag || transaction.tag === 'Other')) {
+                const oldTag = transaction.tag || 'Untagged';
+                transaction.tag = detectedType;
+                updatedCount++;
+
+                // Track counts by type
+                if (detectedType === 'Investments') investmentsCount++;
+                else if (detectedType === 'Savings') savingsCount++;
+                else if (detectedType === 'Transfers') transfersCount++;
+
+                console.log(`🏷️ Auto-detected ${detectedType} for: "${transaction.description}" (was: ${oldTag})`);
+            }
+        });
+
+        if (updatedCount > 0) {
+            console.log(`✅ Enhanced detection complete:`);
+            console.log(`   📊 Total updated: ${updatedCount}`);
+            console.log(`   💰 Investments: ${investmentsCount}`);
+            console.log(`   🏦 Savings: ${savingsCount}`);
+            console.log(`   🔄 Transfers: ${transfersCount}`);
+            calculateStatistics(); // Recalculate statistics
+        } else {
+            console.log('ℹ️ No new transactions detected for auto-categorization');
+        }
+
+        return {
+            total: updatedCount,
+            investments: investmentsCount,
+            savings: savingsCount,
+            transfers: transfersCount
+        };
+    }
+
+    // Function to get current detection statistics
+    function getDetectionStatistics() {
+        const stats = {
+            total: transactions.value.length,
+            investments: 0,
+            savings: 0,
+            transfers: 0,
+            expenses: 0,
+            income: 0,
+            untagged: 0
+        };
+
+        transactions.value.forEach((transaction) => {
+            const tag = transaction.tag || 'Untagged';
+            const debitCredit = transaction.debit_credit || '';
+            const isIncome = debitCredit.trim().toLowerCase() === 'credit';
+
+            if (isIncome) {
+                stats.income++;
+            } else {
+                switch (tag.toLowerCase()) {
+                    case 'investments':
+                        stats.investments++;
+                        break;
+                    case 'savings':
+                        stats.savings++;
+                        break;
+                    case 'transfers':
+                        stats.transfers++;
+                        break;
+                    case 'untagged':
+                        stats.untagged++;
+                        break;
+                    default:
+                        stats.expenses++;
+                        break;
+                }
+            }
+        });
+
+        return stats;
+    }
+
+    // Function to manually override transaction categorization
+    function manuallyOverrideTransaction(transactionId, newTag, reason = 'Manual override') {
+        const transactionIndex = transactions.value.findIndex((t) => t.id === transactionId);
+        if (transactionIndex !== -1) {
+            const oldTag = transactions.value[transactionIndex].tag;
+            transactions.value[transactionIndex].tag = newTag;
+
+            // Add override metadata
+            if (!transactions.value[transactionIndex].overrideHistory) {
+                transactions.value[transactionIndex].overrideHistory = [];
+            }
+            transactions.value[transactionIndex].overrideHistory.push({
+                timestamp: new Date().toISOString(),
+                oldTag,
+                newTag,
+                reason
+            });
+
+            console.log(`🔄 Manual override: Transaction "${transactions.value[transactionIndex].description}" changed from "${oldTag}" to "${newTag}" (${reason})`);
+
+            // Recalculate statistics
+            calculateStatistics();
+
+            return true;
+        }
+        return false;
     }
 
     function resetPersistentCounts() {
@@ -274,30 +514,58 @@ export function useTransactionStore() {
     function calculateStatistics() {
         let incomeCents = 0;
         let expensesCents = 0;
+        let savingsCents = 0;
+        let investmentsCents = 0;
+        let transfersCents = 0;
 
         filteredTransactions.value.forEach((transaction) => {
             // Amount is now stored in cents
             const amountCents = transaction.amount || 0;
+            const transactionTag = transaction.tag || '';
+            const transactionDescription = transaction.description || '';
 
             // Use 'debit_credit' field to determine if it's income or expense
             const debitCredit = transaction.debit_credit || '';
-            const isIncome = debitCredit.trim().toLowerCase() === 'credit';
+            const isIncome = debitCredit.trim().toLowerCase() === 'credit' && (!transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq') || !transactionDescription.toLowerCase().trim().includes('flatex'));
 
             if (isIncome) {
                 incomeCents += Math.abs(amountCents); // Use absolute value for consistency
             } else {
-                expensesCents += Math.abs(amountCents); // Use absolute value for consistency
+                // Check if it's savings, investments, or transfers (not expenses)
+                if (transactionTag.toLowerCase() === 'savings' || transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq')) {
+                    savingsCents += Math.abs(amountCents);
+                } else if (transactionTag.toLowerCase() === 'investments' || transactionDescription.toLowerCase().trim().includes('flatex')) {
+                    investmentsCents += Math.abs(amountCents);
+                } else if (transactionTag.toLowerCase() === 'transfers') {
+                    transfersCents += Math.abs(amountCents);
+                } else {
+                    // Only count as expense if it's not savings, investments, or transfers
+                    expensesCents += Math.abs(amountCents);
+                }
             }
         });
+
+        // Calculate savings rate (savings + investments) / income
+        const totalSavingsAndInvestments = savingsCents;
+        const totalInvestments = investmentsCents;
+        const calculatedSavingsRate = incomeCents > 0 ? (totalSavingsAndInvestments / incomeCents) * 100 : 0;
 
         // Update reactive values (store in cents)
         totalIncome.value = incomeCents;
         totalExpenses.value = expensesCents;
-        netAmount.value = incomeCents - expensesCents;
+        totalSavings.value = savingsCents;
+        totalInvestments.value = investmentsCents;
+        totalTransfers.value = transfersCents;
+        netAmount.value = incomeCents - expensesCents - savingsCents - investmentsCents - transfersCents;
+        savingsRate.value = calculatedSavingsRate;
 
         console.log('📈 Final totals (in cents):', {
             totalIncome: totalIncome.value,
             totalExpenses: totalExpenses.value,
+            totalSavings: totalSavings.value,
+            totalInvestments: totalInvestments.value,
+            totalTransfers: totalTransfers.value,
+            savingsRate: savingsRate.value.toFixed(2) + '%',
             totalTransactions: transactions.value.length,
             netAmount: netAmount.value
         });
@@ -446,6 +714,12 @@ export function useTransactionStore() {
 
         // Calculate statistics
         calculateStatistics();
+
+        // Auto-detect savings and investments for new transactions
+        if (newCount > 0) {
+            console.log('🔍 Auto-running savings/investments detection for new transactions...');
+            applySavingsInvestmentsDetection();
+        }
 
         // Log current persistent counts
         logPersistentCounts();
@@ -725,7 +999,11 @@ export function useTransactionStore() {
         isLoading,
         totalIncome,
         totalExpenses,
+        totalSavings,
+        totalInvestments,
+        totalTransfers,
         netAmount,
+        savingsRate,
 
         // Computed
         filteredTransactions,
@@ -759,6 +1037,14 @@ export function useTransactionStore() {
 
         // Persistent tracking functions
         getPersistentCounts,
-        resetPersistentCounts
+        resetPersistentCounts,
+
+        // Savings and investments detection
+        detectSavingsAndInvestments,
+        applySavingsInvestmentsDetection,
+        getDetectionStatistics,
+
+        // Manual override
+        manuallyOverrideTransaction
     };
 }

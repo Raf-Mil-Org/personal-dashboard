@@ -73,14 +73,14 @@ const tagBreakdownData = computed(() => {
 const incomeExpenseData = computed(() => {
     if (!currentPeriodStats.value) return [];
 
-    const { totalIncome, totalExpenses } = currentPeriodStats.value.summary;
+    const { totalIncome, totalExpenses, totalSavings, totalInvestments, totalTransfers } = currentPeriodStats.value.summary;
 
     return {
-        labels: ['Income', 'Expenses'],
+        labels: ['Income', 'Expenses', 'Savings', 'Investments', 'Transfers'],
         datasets: [
             {
-                data: [totalIncome / 100, totalExpenses / 100], // Convert cents to euros for chart
-                backgroundColor: ['#4CAF50', '#F44336'],
+                data: [totalIncome / 100, totalExpenses / 100, totalSavings / 100, totalInvestments / 100, totalTransfers / 100], // Convert cents to euros for chart
+                backgroundColor: ['#4CAF50', '#F44336', '#2196F3', '#FF9800', '#9C27B0'],
                 borderWidth: 2,
                 borderColor: '#fff'
             }
@@ -146,6 +146,25 @@ const topIncomeCategories = computed(() => {
         }))
         .sort((a, b) => b.amount - a.amount)
         .slice(0, 5);
+});
+
+// Savings and investments breakdown
+const savingsInvestmentsData = computed(() => {
+    if (!currentPeriodStats.value) return [];
+
+    const { totalSavings, totalInvestments, totalTransfers } = currentPeriodStats.value.summary;
+
+    return {
+        labels: ['Savings', 'Investments', 'Transfers'],
+        datasets: [
+            {
+                data: [totalSavings / 100, totalInvestments / 100, totalTransfers / 100], // Convert cents to euros for chart
+                backgroundColor: ['#2196F3', '#FF9800', '#9C27B0'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }
+        ]
+    };
 });
 
 // Chart options
@@ -277,7 +296,7 @@ onMounted(() => {
         <!-- Reports Content -->
         <div v-else-if="currentPeriodStats" class="space-y-6">
             <!-- Period Summary Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <!-- Total Income -->
                 <Card class="text-center">
                     <template #content>
@@ -315,7 +334,7 @@ onMounted(() => {
                             <p class="text-2xl font-bold" :class="currentPeriodStats.summary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'">
                                 {{ formatCurrency(currentPeriodStats.summary.netAmount) }}
                             </p>
-                            <p class="text-sm text-gray-500">Income - Expenses</p>
+                            <p class="text-sm text-gray-500">Income - Expenses - Savings</p>
                         </div>
                     </template>
                 </Card>
@@ -335,10 +354,67 @@ onMounted(() => {
                 </Card>
             </div>
 
+            <!-- Savings & Investments Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Total Savings -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-wallet text-3xl text-emerald-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Savings</h3>
+                            <p class="text-2xl font-bold text-emerald-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalSavings) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.savingsCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Total Investments -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-chart-bar text-3xl text-amber-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Investments</h3>
+                            <p class="text-2xl font-bold text-amber-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalInvestments) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.investmentCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Total Transfers -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-arrow-right-arrow-left text-3xl text-slate-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Transfers</h3>
+                            <p class="text-2xl font-bold text-slate-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalTransfers) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.transferCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Savings Rate -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-percentage text-3xl text-purple-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Savings Rate</h3>
+                            <p class="text-2xl font-bold text-purple-600">{{ currentPeriodStats.summary.savingsRate.toFixed(1) }}%</p>
+                            <p class="text-sm text-gray-500">Savings / Income</p>
+                        </div>
+                    </template>
+                </Card>
+            </div>
+
             <!-- Period Comparison -->
             <div v-if="periodComparison" class="card">
                 <h3 class="text-lg font-semibold mb-4">📈 Period Comparison</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     <!-- Income Comparison -->
                     <div class="bg-green-50 p-4 rounded-lg">
                         <div class="flex items-center justify-between mb-2">
@@ -368,6 +444,49 @@ onMounted(() => {
                         </div>
                     </div>
 
+                    <!-- Savings Comparison -->
+                    <div class="bg-emerald-50 p-4 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-emerald-800">Savings</span>
+                            <i class="pi" :class="periodComparison.savings.change >= 0 ? 'pi-arrow-up text-emerald-600' : 'pi-arrow-down text-red-600'"></i>
+                        </div>
+                        <div class="text-lg font-bold text-emerald-600">
+                            {{ formatCurrency(periodComparison.savings.current) }}
+                        </div>
+                        <div class="text-sm text-emerald-700">
+                            {{ periodComparison.savings.change >= 0 ? '+' : '' }}{{ formatCurrency(periodComparison.savings.change) }} ({{ periodComparison.savings.changePercent >= 0 ? '+' : ''
+                            }}{{ periodComparison.savings.changePercent.toFixed(1) }}%)
+                        </div>
+                    </div>
+
+                    <!-- Investments Comparison -->
+                    <div class="bg-amber-50 p-4 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-amber-800">Investments</span>
+                            <i class="pi" :class="periodComparison.investments.change >= 0 ? 'pi-arrow-up text-amber-600' : 'pi-arrow-down text-red-600'"></i>
+                        </div>
+                        <div class="text-lg font-bold text-amber-600">
+                            {{ formatCurrency(periodComparison.investments.current) }}
+                        </div>
+                        <div class="text-sm text-amber-700">
+                            {{ periodComparison.investments.change >= 0 ? '+' : '' }}{{ formatCurrency(periodComparison.investments.change) }} ({{ periodComparison.investments.changePercent >= 0 ? '+' : ''
+                            }}{{ periodComparison.investments.changePercent.toFixed(1) }}%)
+                        </div>
+                    </div>
+
+                    <!-- Savings Rate Comparison -->
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-purple-800">Savings Rate</span>
+                            <i class="pi" :class="periodComparison.savingsRate.change >= 0 ? 'pi-arrow-up text-purple-600' : 'pi-arrow-down text-red-600'"></i>
+                        </div>
+                        <div class="text-lg font-bold text-purple-600">{{ periodComparison.savingsRate.current.toFixed(1) }}%</div>
+                        <div class="text-sm text-purple-700">
+                            {{ periodComparison.savingsRate.change >= 0 ? '+' : '' }}{{ periodComparison.savingsRate.change.toFixed(1) }}% ({{ periodComparison.savingsRate.changePercent >= 0 ? '+' : ''
+                            }}{{ periodComparison.savingsRate.changePercent.toFixed(1) }}%)
+                        </div>
+                    </div>
+
                     <!-- Net Comparison -->
                     <div class="bg-blue-50 p-4 rounded-lg">
                         <div class="flex items-center justify-between mb-2">
@@ -385,7 +504,7 @@ onMounted(() => {
             </div>
 
             <!-- Charts Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Expense Breakdown by Tag -->
                 <Card>
                     <template #title>
@@ -402,14 +521,26 @@ onMounted(() => {
                     </template>
                 </Card>
 
-                <!-- Income vs Expenses -->
+                <!-- Income vs Expenses vs Savings -->
                 <Card>
                     <template #title>
-                        <h3 class="text-lg font-semibold">📊 Income vs Expenses</h3>
+                        <h3 class="text-lg font-semibold">📊 Income vs Expenses vs Savings</h3>
                     </template>
                     <template #content>
                         <div class="h-64">
                             <Chart type="pie" :data="incomeExpenseData" :options="chartOptions" />
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Savings & Investments Breakdown -->
+                <Card>
+                    <template #title>
+                        <h3 class="text-lg font-semibold">💰 Savings & Investments</h3>
+                    </template>
+                    <template #content>
+                        <div class="h-64">
+                            <Chart type="doughnut" :data="savingsInvestmentsData" :options="chartOptions" />
                         </div>
                     </template>
                 </Card>

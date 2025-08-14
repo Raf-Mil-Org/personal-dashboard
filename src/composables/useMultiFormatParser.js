@@ -71,8 +71,6 @@ export function useMultiFormatParser() {
             Taxes: 'Other',
             'Extra loan repayment': 'Other',
             'Extra mortgage repayment': 'Other',
-            Savings: 'Other',
-            Investment: 'Other',
             'Business expenses': 'Other',
             Other: 'Other'
         },
@@ -106,10 +104,32 @@ export function useMultiFormatParser() {
             'Group this yourself': 'Other'
         },
         'To your accounts': {
-            Savings: 'Other',
-            'Joint account': 'Other',
-            'Investment account': 'Other',
-            Other: 'Other'
+            Savings: 'Savings',
+            'Joint account': 'Transfers',
+            'Investment account': 'Investments',
+            Other: 'Transfers'
+        },
+        // New categories for savings and investments
+        Savings: {
+            'Savings account': 'Savings',
+            'Emergency fund': 'Savings',
+            'Goal savings': 'Savings',
+            Other: 'Savings'
+        },
+        Investments: {
+            Investment: 'Investments',
+            'Investment account': 'Investments',
+            'Stock market': 'Investments',
+            Crypto: 'Investments',
+            ETF: 'Investments',
+            'Mutual funds': 'Investments',
+            Other: 'Investments'
+        },
+        Transfers: {
+            'Internal transfer': 'Transfers',
+            'Account transfer': 'Transfers',
+            'Between accounts': 'Transfers',
+            Other: 'Transfers'
         }
     };
 

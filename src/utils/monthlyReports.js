@@ -127,25 +127,50 @@ export function calculateMonthlyStats(transactions, start, end) {
 
     let totalIncome = 0;
     let totalExpenses = 0;
+    let totalSavings = 0;
+    let totalInvestments = 0;
+    let totalTransfers = 0;
     let incomeCount = 0;
     let expenseCount = 0;
+    let savingsCount = 0;
+    let investmentCount = 0;
+    let transferCount = 0;
 
     periodTransactions.forEach((transaction) => {
         const amount = parseInt(transaction.amount) || 0; // Amount is now stored in cents
+        const transactionTag = transaction.tag || '';
+        const transactionDescription = transaction.description || '';
 
         // Use enhanced transaction type determination
         const transactionType = determineTransactionType(transaction);
 
         if (transactionType.isIncome) {
-            totalIncome += Math.abs(amount);
-            incomeCount++;
+            // Check for specific exclusions in income
+            if (!transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq') && !transactionDescription.toLowerCase().trim().includes('flatex')) {
+                totalIncome += Math.abs(amount);
+                incomeCount++;
+            }
         } else {
-            totalExpenses += Math.abs(amount);
-            expenseCount++;
+            // Check if it's savings, investments, or transfers (not expenses)
+            if (transactionTag.toLowerCase() === 'savings' || transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq')) {
+                totalSavings += Math.abs(amount);
+                savingsCount++;
+            } else if (transactionTag.toLowerCase() === 'investments' || transactionDescription.toLowerCase().trim().includes('flatex')) {
+                totalInvestments += Math.abs(amount);
+                investmentCount++;
+            } else if (transactionTag.toLowerCase() === 'transfers') {
+                totalTransfers += Math.abs(amount);
+                transferCount++;
+            } else {
+                // Only count as expense if it's not savings, investments, or transfers
+                totalExpenses += Math.abs(amount);
+                expenseCount++;
+            }
         }
     });
 
-    const netAmount = totalIncome - totalExpenses;
+    const netAmount = totalIncome - totalExpenses - totalSavings - totalInvestments - totalTransfers;
+    const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
 
     return {
         period: {
@@ -157,9 +182,16 @@ export function calculateMonthlyStats(transactions, start, end) {
         summary: {
             totalIncome,
             totalExpenses,
+            totalSavings,
+            totalInvestments,
+            totalTransfers,
             netAmount,
+            savingsRate,
             incomeCount,
             expenseCount,
+            savingsCount,
+            investmentCount,
+            transferCount,
             totalTransactions: periodTransactions.length
         },
         transactions: periodTransactions
@@ -208,7 +240,11 @@ export function comparePeriods(currentStats, previousStats) {
 
     const incomeChange = current.totalIncome - previous.totalIncome;
     const expenseChange = current.totalExpenses - previous.totalExpenses;
+    const savingsChange = current.totalSavings - previous.totalSavings;
+    const investmentChange = current.totalInvestments - previous.totalInvestments;
+    const transferChange = current.totalTransfers - previous.totalTransfers;
     const netChange = current.netAmount - previous.netAmount;
+    const savingsRateChange = current.savingsRate - previous.savingsRate;
 
     return {
         income: {
@@ -222,6 +258,30 @@ export function comparePeriods(currentStats, previousStats) {
             previous: previous.totalExpenses,
             change: expenseChange,
             changePercent: previous.totalExpenses > 0 ? (expenseChange / previous.totalExpenses) * 100 : 0
+        },
+        savings: {
+            current: current.totalSavings,
+            previous: previous.totalSavings,
+            change: savingsChange,
+            changePercent: previous.totalSavings > 0 ? (savingsChange / previous.totalSavings) * 100 : 0
+        },
+        investments: {
+            current: current.totalInvestments,
+            previous: previous.totalInvestments,
+            change: investmentChange,
+            changePercent: previous.totalInvestments > 0 ? (investmentChange / previous.totalInvestments) * 100 : 0
+        },
+        transfers: {
+            current: current.totalTransfers,
+            previous: previous.totalTransfers,
+            change: transferChange,
+            changePercent: previous.totalTransfers > 0 ? (transferChange / previous.totalTransfers) * 100 : 0
+        },
+        savingsRate: {
+            current: current.savingsRate,
+            previous: previous.savingsRate,
+            change: savingsRateChange,
+            changePercent: previous.savingsRate > 0 ? (savingsRateChange / previous.savingsRate) * 100 : 0
         },
         net: {
             current: current.netAmount,
