@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { parseAmountToCents } from '@/utils/currencyUtils';
 
 export function useCSVParser() {
     const parseError = ref(null);
@@ -122,12 +123,12 @@ export function useCSVParser() {
      */
     function generateTransactionId(transaction) {
         const date = transaction.Date || transaction.date || transaction.executionDate || '';
-        const amount = transaction.Amount || transaction.amount || (transaction.amount?.value || '');
+        const amount = transaction.Amount || transaction.amount || transaction.amount?.value || '';
         const description = transaction.Description || transaction.description || transaction.subject || transaction.Memo || transaction.memo || '';
 
         // Create a normalized string for consistent hashing
         let normalizedDate = date.toString().trim();
-        
+
         // Normalize date format: convert YYYYMMDD to YYYY-MM-DD
         if (normalizedDate.match(/^\d{8}$/)) {
             // Format: YYYYMMDD -> YYYY-MM-DD
@@ -136,8 +137,10 @@ export function useCSVParser() {
             const day = normalizedDate.substring(6, 8);
             normalizedDate = `${year}-${month}-${day}`;
         }
-        // Normalize amount: replace comma with period for European decimal format
-        const normalizedAmount = amount.toString().trim().replace(',', '.');
+
+        // Convert amount to cents for consistent hashing
+        const amountInCents = parseAmountToCents(amount);
+        const normalizedAmount = amountInCents.toString();
         const normalizedDescription = description.toString().trim().toLowerCase();
 
         const hashString = `${normalizedDate}-${normalizedAmount}-${normalizedDescription}`;

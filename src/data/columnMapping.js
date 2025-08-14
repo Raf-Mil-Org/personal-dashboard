@@ -1,3 +1,5 @@
+import { parseAmountToCents } from '@/utils/currencyUtils';
+
 // Standard column mapping for consistent data table rendering
 export const STANDARD_COLUMNS = {
     // Core transaction fields
@@ -10,7 +12,7 @@ export const STANDARD_COLUMNS = {
     category: 'category',
     subcategory: 'subcategory',
     tag: 'tag',
-    
+
     // Additional fields that might be available
     account: 'account',
     counterparty: 'counterparty',
@@ -19,7 +21,7 @@ export const STANDARD_COLUMNS = {
     transaction_type: 'transaction_type',
     notifications: 'notifications',
     balance: 'balance',
-    
+
     // JSON-specific fields
     execution_date: 'executionDate',
     amount_value: 'amount.value',
@@ -28,7 +30,7 @@ export const STANDARD_COLUMNS = {
     counter_account_name: 'counterAccount.name',
     subject: 'subject',
     sub_category: 'subCategory.description',
-    
+
     // CSV-specific fields
     'Name / Description': 'description',
     'Amount (EUR)': 'amount',
@@ -58,24 +60,17 @@ export const COLUMN_DISPLAY_NAMES = {
 };
 
 // Default visible columns for the data table
-export const DEFAULT_VISIBLE_COLUMNS = [
-    'date',
-    'description',
-    'amount',
-    'category',
-    'subcategory',
-    'tag'
-];
+export const DEFAULT_VISIBLE_COLUMNS = ['date', 'description', 'amount', 'category', 'subcategory', 'tag'];
 
 // Helper function to normalize transaction descriptions for consistency
 const normalizeDescription = (description) => {
     if (!description) return null;
-    
+
     // Normalize Revolut descriptions to be consistent
     if (description.includes('Revolut**7355*')) {
         return 'Revolut**7355*';
     }
-    
+
     return description;
 };
 
@@ -84,22 +79,21 @@ export const mapCSVToStandard = (csvTransaction) => {
     // Handle amount with proper sign based on debit/credit field
     let amount = csvTransaction['Amount (EUR)'] || csvTransaction.Amount || csvTransaction.amount || null;
     const debitCredit = csvTransaction['Debit/credit'] || csvTransaction.debit_credit || null;
-    
+
     if (amount && debitCredit) {
-        // Normalize amount: replace comma with period for European decimal format
-        const normalizedAmount = amount.toString().trim().replace(',', '.');
-        const numAmount = parseFloat(normalizedAmount);
-        
-        if (!isNaN(numAmount)) {
-            // Apply sign based on debit/credit field
-            if (debitCredit.toLowerCase() === 'debit') {
-                amount = (-numAmount).toString();
-            } else if (debitCredit.toLowerCase() === 'credit') {
-                amount = numAmount.toString();
-            }
+        // Convert to cents and apply sign based on debit/credit field
+        const amountInCents = parseAmountToCents(amount);
+
+        if (debitCredit.toLowerCase() === 'debit') {
+            amount = -amountInCents; // Negative cents for debits
+        } else if (debitCredit.toLowerCase() === 'credit') {
+            amount = amountInCents; // Positive cents for credits
         }
+    } else if (amount) {
+        // If no debit/credit field, just convert to cents
+        amount = parseAmountToCents(amount);
     }
-    
+
     // Normalize date format: convert YYYYMMDD to YYYY-MM-DD
     let normalizedDate = csvTransaction.Date || csvTransaction.date || null;
     if (normalizedDate && normalizedDate.toString().match(/^\d{8}$/)) {
@@ -109,13 +103,11 @@ export const mapCSVToStandard = (csvTransaction) => {
         const day = normalizedDate.substring(6, 8);
         normalizedDate = `${year}-${month}-${day}`;
     }
-    
+
     // Normalize description
     const rawDescription = csvTransaction['Name / Description'] || csvTransaction.Description || csvTransaction.description || null;
     const normalizedDescription = normalizeDescription(rawDescription);
-    
 
-    
     return {
         id: csvTransaction.id || null,
         date: normalizedDate,
@@ -140,13 +132,11 @@ export const mapJSONToStandard = (jsonTransaction) => {
     // Normalize description
     const rawDescription = jsonTransaction.subject || jsonTransaction.counterAccount?.name || jsonTransaction.description || null;
     const normalizedDescription = normalizeDescription(rawDescription);
-    
 
-    
     return {
         id: jsonTransaction.id || null,
         date: jsonTransaction.executionDate || jsonTransaction.date || null,
-        amount: jsonTransaction.amount?.value || jsonTransaction.amount || null,
+        amount: parseAmountToCents(jsonTransaction.amount?.value || jsonTransaction.amount),
         currency: jsonTransaction.amount?.currency || jsonTransaction.currency || 'EUR',
         description: normalizedDescription,
         type: jsonTransaction.type?.description || jsonTransaction.type || null,
@@ -159,12 +149,12 @@ export const mapJSONToStandard = (jsonTransaction) => {
         debit_credit: (() => {
             const amount = jsonTransaction.amount?.value || jsonTransaction.amount;
             if (!amount) return null;
-            const numAmount = parseFloat(amount);
-            return isNaN(numAmount) ? null : (numAmount < 0 ? 'debit' : 'credit');
+            const amountInCents = parseAmountToCents(amount);
+            return amountInCents < 0 ? 'debit' : 'credit';
         })(),
         transaction_type: jsonTransaction.transaction_type || null,
         notifications: jsonTransaction.notifications || null,
-        balance: jsonTransaction.balance || null
+        balance: jsonTransaction.balance ? parseAmountToCents(jsonTransaction.balance) : null
     };
 };
 
@@ -186,75 +176,131 @@ export const isDefaultVisibleColumn = (column) => {
 // Intelligent category detection based on transaction description
 export const detectCategoryFromDescription = (description) => {
     if (!description) return { category: null, subcategory: null };
-    
+
     const desc = description.toLowerCase();
-    
+
     // Groceries & household
-    if (desc.includes('albert heijn') || desc.includes('lidl') || desc.includes('dirk') || 
-        desc.includes('jumbo') || desc.includes('ah') || desc.includes('supermarket') ||
-        desc.includes('pantopoleio') || desc.includes('bazaar')) {
+    if (desc.includes('albert heijn') || desc.includes('lidl') || desc.includes('dirk') || desc.includes('jumbo') || desc.includes('ah') || desc.includes('supermarket') || desc.includes('pantopoleio') || desc.includes('bazaar')) {
         return { category: 'Groceries & household', subcategory: 'Groceries' };
     }
-    
+
     // Restaurants & bars
-    if (desc.includes('restaurant') || desc.includes('cafe') || desc.includes('bar') ||
-        desc.includes('taverna') || desc.includes('kafeneio') || desc.includes('mezedopoleio') ||
-        desc.includes('tsimbi') || desc.includes('koulouri') || desc.includes('yolo beach') ||
-        desc.includes('kardaras') || desc.includes('patarlas') || desc.includes('agorastou') ||
-        desc.includes('to limani') || desc.includes('mitropoulou') || desc.includes('anastasia') ||
-        desc.includes('s mylonas') || desc.includes('kalamaki') || desc.includes('de tox') ||
-        desc.includes('mentousa') || desc.includes('rodostalis') || desc.includes('project coffee') ||
-        desc.includes('kipotheatro') || desc.includes('venetis') || desc.includes('boothuis') ||
-        desc.includes('sensemilla') || desc.includes('monk') || desc.includes('psarrou') ||
-        desc.includes('potsios') || desc.includes('hosein') || desc.includes('tsakmaki') ||
-        desc.includes('kalogerakis') || desc.includes('papakrivopoulos') || desc.includes('coeo')) {
+    if (
+        desc.includes('restaurant') ||
+        desc.includes('cafe') ||
+        desc.includes('bar') ||
+        desc.includes('taverna') ||
+        desc.includes('kafeneio') ||
+        desc.includes('mezedopoleio') ||
+        desc.includes('tsimbi') ||
+        desc.includes('koulouri') ||
+        desc.includes('yolo beach') ||
+        desc.includes('kardaras') ||
+        desc.includes('patarlas') ||
+        desc.includes('agorastou') ||
+        desc.includes('to limani') ||
+        desc.includes('mitropoulou') ||
+        desc.includes('anastasia') ||
+        desc.includes('s mylonas') ||
+        desc.includes('kalamaki') ||
+        desc.includes('de tox') ||
+        desc.includes('mentousa') ||
+        desc.includes('rodostalis') ||
+        desc.includes('project coffee') ||
+        desc.includes('kipotheatro') ||
+        desc.includes('venetis') ||
+        desc.includes('boothuis') ||
+        desc.includes('sensemilla') ||
+        desc.includes('monk') ||
+        desc.includes('psarrou') ||
+        desc.includes('potsios') ||
+        desc.includes('hosein') ||
+        desc.includes('tsakmaki') ||
+        desc.includes('kalogerakis') ||
+        desc.includes('papakrivopoulos') ||
+        desc.includes('coeo')
+    ) {
         return { category: 'Restaurants & bars', subcategory: 'Restaurants' };
     }
-    
+
     // Transport & travel
-    if (desc.includes('oasa') || desc.includes('eticket') || desc.includes('transport') ||
-        desc.includes('metro') || desc.includes('bus') || desc.includes('train') ||
-        desc.includes('transavia') || desc.includes('flight') || desc.includes('airport') ||
-        desc.includes('uber') || desc.includes('taxi') || desc.includes('revolut') ||
-        desc.includes('eko') || desc.includes('gas') || desc.includes('fuel')) {
+    if (
+        desc.includes('oasa') ||
+        desc.includes('eticket') ||
+        desc.includes('transport') ||
+        desc.includes('metro') ||
+        desc.includes('bus') ||
+        desc.includes('train') ||
+        desc.includes('transavia') ||
+        desc.includes('flight') ||
+        desc.includes('airport') ||
+        desc.includes('uber') ||
+        desc.includes('taxi') ||
+        desc.includes('revolut') ||
+        desc.includes('eko') ||
+        desc.includes('gas') ||
+        desc.includes('fuel')
+    ) {
         return { category: 'Transport & travel', subcategory: 'Public transport' };
     }
-    
+
     // Health & Wellness
-    if (desc.includes('farmacie') || desc.includes('pharmacy') || desc.includes('drugstore') ||
-        desc.includes('wellness') || desc.includes('fitness') || desc.includes('sportcity') ||
-        desc.includes('trikkalid') || desc.includes('beauty') || desc.includes('hair')) {
+    if (
+        desc.includes('farmacie') ||
+        desc.includes('pharmacy') ||
+        desc.includes('drugstore') ||
+        desc.includes('wellness') ||
+        desc.includes('fitness') ||
+        desc.includes('sportcity') ||
+        desc.includes('trikkalid') ||
+        desc.includes('beauty') ||
+        desc.includes('hair')
+    ) {
         return { category: 'Health & Wellness', subcategory: 'Pharmacy & drugstore' };
     }
-    
+
     // Shopping
-    if (desc.includes('shopping') || desc.includes('store') || desc.includes('shop') ||
-        desc.includes('hondos') || desc.includes('duty free') || desc.includes('media') ||
-        desc.includes('bol.com') || desc.includes('amazon') || desc.includes('danika') ||
-        desc.includes('whsmith') || desc.includes('artisan')) {
+    if (
+        desc.includes('shopping') ||
+        desc.includes('store') ||
+        desc.includes('shop') ||
+        desc.includes('hondos') ||
+        desc.includes('duty free') ||
+        desc.includes('media') ||
+        desc.includes('bol.com') ||
+        desc.includes('amazon') ||
+        desc.includes('danika') ||
+        desc.includes('whsmith') ||
+        desc.includes('artisan')
+    ) {
         return { category: 'Shopping', subcategory: 'Clothes' };
     }
-    
+
     // Fixed expenses
-    if (desc.includes('mortgage') || desc.includes('insurance') || desc.includes('unive') ||
-        desc.includes('zilveren kruis') || desc.includes('nn schadeverzekering') ||
-        desc.includes('artsen zonder grenzen') || desc.includes('amazon eu') ||
-        desc.includes('mediamarkt') || desc.includes('belastingdienst') ||
-        desc.includes('kosten oranjepakket')) {
+    if (
+        desc.includes('mortgage') ||
+        desc.includes('insurance') ||
+        desc.includes('unive') ||
+        desc.includes('zilveren kruis') ||
+        desc.includes('nn schadeverzekering') ||
+        desc.includes('artsen zonder grenzen') ||
+        desc.includes('amazon eu') ||
+        desc.includes('mediamarkt') ||
+        desc.includes('belastingdienst') ||
+        desc.includes('kosten oranjepakket')
+    ) {
         return { category: 'Fixed expenses', subcategory: 'Insurance' };
     }
-    
+
     // Other
-    if (desc.includes('income') || desc.includes('salary') || desc.includes('salaris') ||
-        desc.includes('abn amro bank')) {
+    if (desc.includes('income') || desc.includes('salary') || desc.includes('salaris') || desc.includes('abn amro bank')) {
         return { category: 'Other', subcategory: 'Income' };
     }
-    
+
     // Savings & investments
-    if (desc.includes('savings') || desc.includes('spaarrekening') || desc.includes('flatex') ||
-        desc.includes('investment') || desc.includes('cash order')) {
+    if (desc.includes('savings') || desc.includes('spaarrekening') || desc.includes('flatex') || desc.includes('investment') || desc.includes('cash order')) {
         return { category: 'Other', subcategory: 'Savings' };
     }
-    
+
     return { category: null, subcategory: null };
-}; 
+};

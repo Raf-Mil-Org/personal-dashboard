@@ -2,6 +2,7 @@
 import { useMultiFormatParser } from '@/composables/useMultiFormatParser';
 import { useTransactionStore } from '@/composables/useTransactionStore';
 import { getColumnDisplayName } from '@/data/columnMapping';
+import { formatCentsAsEuro, centsToEuroString } from '@/utils/currencyUtils';
 import { getTagSeverity, getTagValue, getTagIcon } from '@/utils/tagColors';
 import { formatAmountWithType } from '@/utils/transactionTypeDetermination';
 import Button from 'primevue/button';
@@ -227,27 +228,25 @@ const formatDate = (date) => {
 
 const formatAmount = (amount) => {
     if (!amount || amount === 'No Amount') return 'No Amount';
-    // Handle comma as decimal separator (European format)
-    const cleanAmount = amount.toString().replace(',', '.');
-    const num = parseFloat(cleanAmount);
-    if (isNaN(num)) return amount;
+
+    // Amount is now stored in cents
+    const amountCents = parseInt(amount);
+    if (isNaN(amountCents)) return amount;
 
     // Format with sign (+ for positive, - for negative)
-    const sign = num >= 0 ? '+' : '';
-    const absoluteValue = Math.abs(num);
+    const sign = amountCents >= 0 ? '+' : '';
+    const absoluteValue = Math.abs(amountCents);
     const formattedValue = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'EUR'
-    }).format(absoluteValue);
+    }).format(absoluteValue / 100);
 
     return `${sign}${formattedValue}`;
 };
 
 const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'EUR'
-    }).format(amount);
+    // Amount is now stored in cents, convert to euros for display
+    return formatCentsAsEuro(amount);
 };
 
 // Using getColumnDisplayName from columnMapping module
@@ -324,7 +323,17 @@ const searchFilteredTransactions = computed(() => {
 
         filtered = filtered.filter((transaction) => {
             // Search in multiple fields
-            const searchableFields = [transaction.description, transaction.tag, transaction.category, transaction.subcategory, transaction.amount, transaction.date, transaction.account, transaction.counterparty]
+            const searchableFields = [
+                transaction.description,
+                transaction.tag,
+                transaction.category,
+                transaction.subcategory,
+                transaction.date,
+                transaction.account,
+                transaction.counterparty,
+                // Convert cents to euros for search
+                transaction.amount ? centsToEuroString(transaction.amount) : null
+            ]
                 .filter((field) => field != null)
                 .map((field) => field.toString().toLowerCase());
 
@@ -345,10 +354,9 @@ const tagStatistics = computed(() => {
             tagStats[tag] = { count: 0, total: 0 };
         }
         tagStats[tag].count++;
-        // Handle amount field with standard column name
-        const amountStr = transaction.amount || '0';
-        const amount = parseFloat(amountStr.toString().replace(',', '.'));
-        tagStats[tag].total += amount;
+        // Amount is now stored in cents
+        const amountCents = transaction.amount || 0;
+        tagStats[tag].total += amountCents;
     });
 
     return tagStats;
@@ -546,7 +554,7 @@ watch(
                     </div>
                 </div>
 
-                <p v-for="value in searchFilteredTransactions.map((transaction) => transaction.amount)" :key="value">{{ `${value}` }}</p>
+                <!-- <p v-for="value in searchFilteredTransactions.map((transaction) => transaction.amount)" :key="value">{{ `${value}` }}</p> -->
                 <!-- <p>{{ JSON.stringify(Object.keys(searchFilteredTransactions[0])) }}</p> -->
                 <!-- <p v-for="value in Object.keys(searchFilteredTransactions[0])" :key="value">{{ `${value}: ${searchFilteredTransactions[0][value]}` }}</p> -->
                 <DataTable

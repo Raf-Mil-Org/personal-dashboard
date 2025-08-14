@@ -14,13 +14,13 @@ const DEFAULT_LOCALE = 'en-US';
 export const parseCurrency = (value) => {
     if (typeof value === 'number') return value;
     if (!value || value === '') return 0;
-    
+
     // Remove currency symbols, spaces, and commas
     const cleaned = String(value)
         .replace(/[€$£¥₹₽₿]/g, '') // Remove currency symbols
         .replace(/\s/g, '') // Remove spaces
         .replace(/,/g, ''); // Remove thousand separators
-    
+
     const parsed = parseFloat(cleaned);
     return isNaN(parsed) ? 0 : parsed;
 };
@@ -29,18 +29,12 @@ export const parseCurrency = (value) => {
  * Format a number as currency for display
  */
 export const formatCurrency = (amount, options = {}) => {
-    const {
-        currency = DEFAULT_CURRENCY,
-        locale = DEFAULT_LOCALE,
-        minimumFractionDigits = 2,
-        maximumFractionDigits = 2,
-        useGrouping = true
-    } = options;
-    
+    const { currency = DEFAULT_CURRENCY, locale = DEFAULT_LOCALE, minimumFractionDigits = 2, maximumFractionDigits = 2, useGrouping = true } = options;
+
     if (amount === null || amount === undefined || isNaN(amount)) {
         return formatCurrency(0, options);
     }
-    
+
     return new Intl.NumberFormat(locale, {
         style: 'currency',
         currency,
@@ -54,17 +48,12 @@ export const formatCurrency = (amount, options = {}) => {
  * Format a number as currency without the currency symbol (for calculations)
  */
 export const formatAmount = (amount, options = {}) => {
-    const {
-        locale = DEFAULT_LOCALE,
-        minimumFractionDigits = 2,
-        maximumFractionDigits = 2,
-        useGrouping = true
-    } = options;
-    
+    const { locale = DEFAULT_LOCALE, minimumFractionDigits = 2, maximumFractionDigits = 2, useGrouping = true } = options;
+
     if (amount === null || amount === undefined || isNaN(amount)) {
         return formatAmount(0, options);
     }
-    
+
     return new Intl.NumberFormat(locale, {
         minimumFractionDigits,
         maximumFractionDigits,
@@ -149,4 +138,67 @@ export const fromCents = (cents) => {
 export const roundAmount = (amount, decimals = 2) => {
     const factor = Math.pow(10, decimals);
     return Math.round(parseCurrency(amount) * factor) / factor;
+};
+
+// Currency utility functions for handling euro amounts as integer cents
+// This prevents floating-point precision issues in financial calculations
+
+/**
+ * Convert euro amount to cents (integer)
+ * @param {number|string} value - Euro amount (can be positive or negative)
+ * @returns {number} Amount in cents as integer
+ */
+export const euroToCents = (value) => {
+    if (typeof value === 'string') {
+        // Handle string inputs (remove commas, convert to number)
+        const cleanValue = value.replace(/,/g, '');
+        return Math.round(parseFloat(cleanValue) * 100);
+    }
+    return Math.round(value * 100);
+};
+
+/**
+ * Convert cents (integer) to euro string with exactly 2 decimal places
+ * @param {number} cents - Amount in cents (can be positive or negative)
+ * @returns {string} Euro amount as string with 2 decimal places
+ */
+export const centsToEuroString = (cents) => {
+    return (cents / 100).toFixed(2);
+};
+
+/**
+ * Format cents as euro string with proper locale formatting
+ * @param {number} cents - Amount in cents
+ * @param {string} locale - Locale for formatting (default: 'en-US')
+ * @returns {string} Formatted euro string
+ */
+export const formatCentsAsEuro = (cents, locale = 'en-US') => {
+    return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(cents / 100);
+};
+
+/**
+ * Parse various amount formats to cents
+ * @param {string|number} amount - Amount in various formats
+ * @returns {number} Amount in cents
+ */
+export const parseAmountToCents = (amount) => {
+    if (typeof amount === 'number') {
+        return euroToCents(amount);
+    }
+
+    if (typeof amount === 'string') {
+        // Remove currency symbols, spaces, and normalize decimal separator
+        const cleanAmount = amount
+            .replace(/[€$£\s]/g, '') // Remove currency symbols and spaces
+            .replace(/,/g, '.'); // Convert comma to period for decimal
+
+        return euroToCents(parseFloat(cleanAmount));
+    }
+
+    return 0;
 };

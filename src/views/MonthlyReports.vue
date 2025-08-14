@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useTransactionStore } from '@/composables/useTransactionStore';
 import { getAvailablePeriods, calculateMonthlyStats, comparePeriods } from '@/utils/monthlyReports';
 import { formatAmountWithType } from '@/utils/transactionTypeDetermination';
+import { formatCentsAsEuro } from '@/utils/currencyUtils';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
@@ -41,12 +42,12 @@ watch(
 const tagBreakdownData = computed(() => {
     if (!currentPeriodStats.value) return [];
 
-    const expenses = currentPeriodStats.value.transactions.filter((t) => parseFloat(t.amount) < 0);
+    const expenses = currentPeriodStats.value.transactions.filter((t) => parseInt(t.amount) < 0);
     const tagMap = {};
 
     expenses.forEach((transaction) => {
         const tag = transaction.tag || 'Untagged';
-        const amount = Math.abs(parseFloat(transaction.amount));
+        const amount = Math.abs(parseInt(transaction.amount)); // Amount in cents
 
         if (!tagMap[tag]) {
             tagMap[tag] = 0;
@@ -60,7 +61,7 @@ const tagBreakdownData = computed(() => {
         labels: Object.keys(tagMap),
         datasets: [
             {
-                data: Object.values(tagMap),
+                data: Object.values(tagMap).map((cents) => cents / 100), // Convert cents to euros for chart
                 backgroundColor: colors.slice(0, Object.keys(tagMap).length),
                 borderWidth: 2,
                 borderColor: '#fff'
@@ -78,7 +79,7 @@ const incomeExpenseData = computed(() => {
         labels: ['Income', 'Expenses'],
         datasets: [
             {
-                data: [totalIncome, totalExpenses],
+                data: [totalIncome / 100, totalExpenses / 100], // Convert cents to euros for chart
                 backgroundColor: ['#4CAF50', '#F44336'],
                 borderWidth: 2,
                 borderColor: '#fff'
@@ -90,12 +91,12 @@ const incomeExpenseData = computed(() => {
 const topExpenseCategories = computed(() => {
     if (!currentPeriodStats.value) return [];
 
-    const expenses = currentPeriodStats.value.transactions.filter((t) => parseFloat(t.amount) < 0);
+    const expenses = currentPeriodStats.value.transactions.filter((t) => parseInt(t.amount) < 0);
     const categoryMap = {};
 
     expenses.forEach((transaction) => {
         const tag = transaction.tag || 'Untagged';
-        const amount = Math.abs(parseFloat(transaction.amount));
+        const amount = Math.abs(parseInt(transaction.amount)); // Amount in cents
 
         if (!categoryMap[tag]) {
             categoryMap[tag] = { amount: 0, count: 0 };
@@ -120,12 +121,12 @@ const topExpenseCategories = computed(() => {
 const topIncomeCategories = computed(() => {
     if (!currentPeriodStats.value) return [];
 
-    const income = currentPeriodStats.value.transactions.filter((t) => parseFloat(t.amount) > 0);
+    const income = currentPeriodStats.value.transactions.filter((t) => parseInt(t.amount) > 0);
     const categoryMap = {};
 
     income.forEach((transaction) => {
         const tag = transaction.tag || 'Untagged';
-        const amount = parseFloat(transaction.amount);
+        const amount = parseInt(transaction.amount); // Amount in cents
 
         if (!categoryMap[tag]) {
             categoryMap[tag] = { amount: 0, count: 0 };
@@ -181,10 +182,8 @@ const loadPeriodStats = () => {
 };
 
 const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'EUR'
-    }).format(amount);
+    // Amount is now stored in cents, convert to euros for display
+    return formatCentsAsEuro(amount);
 };
 
 const formatDate = (date) => {

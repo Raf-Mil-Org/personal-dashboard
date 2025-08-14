@@ -216,52 +216,30 @@ export function useTransactionStore() {
     }
 
     function calculateStatistics() {
-        // console.log('📊 Calculating statistics for', transactions.value.length, 'transactions');
-        // console.log('📊 Transaction IDs in array:', transactions.value.map(t => t.id).slice(0, 10)); // Show first 10 IDs
+        let incomeCents = 0;
+        let expensesCents = 0;
 
-        let income = 0;
-        let expenses = 0;
-
-        filteredTransactions.value.forEach((transaction, index) => {
-            // Handle amount field with standard column name
-            const amountStr = transaction.amount || '0';
-            const amount = parseFloat(amountStr.toString().replace(',', '.'));
+        filteredTransactions.value.forEach((transaction) => {
+            // Amount is now stored in cents
+            const amountCents = transaction.amount || 0;
 
             // Use 'debit_credit' field to determine if it's income or expense
             const debitCredit = transaction.debit_credit || '';
             const isIncome = debitCredit.trim().toLowerCase() === 'credit';
 
-            // console.log(`Transaction ${index + 1}:`, {
-            //     amount: amountStr,
-            //     parsedAmount: amount,
-            //     isNaN: isNaN(amount),
-            //     debitCredit: debitCredit,
-            //     isIncome: isIncome,
-            //     description: transaction.description || 'No description',
-            //     allKeys: Object.keys(transaction)
-            // });
-
-            if (isNaN(amount)) {
-                console.log(`  ⚠️ Skipping transaction with invalid amount: ${amountStr}`);
-                return;
-            }
-
             if (isIncome) {
-                income += Math.abs(amount); // Use absolute value for consistency
-                // console.log(`  → Added to income: ${Math.abs(amount)} (Total income now: ${income})`);
-                // console.log(`  → INCOME TRANSACTION: ${transaction.description} | Amount: ${amountStr} | Debit/Credit: ${debitCredit}`);
+                incomeCents += Math.abs(amountCents); // Use absolute value for consistency
             } else {
-                expenses += Math.abs(amount); // Use absolute value for consistency
-                // console.log(`  → Added to expenses: ${Math.abs(amount)} (Total expenses now: ${expenses})`);
+                expensesCents += Math.abs(amountCents); // Use absolute value for consistency
             }
         });
 
-        // Update reactive values
-        totalIncome.value = income;
-        totalExpenses.value = expenses;
-        netAmount.value = income - expenses;
+        // Update reactive values (store in cents)
+        totalIncome.value = incomeCents;
+        totalExpenses.value = expensesCents;
+        netAmount.value = incomeCents - expensesCents;
 
-        console.log('📈 Final totals:', {
+        console.log('📈 Final totals (in cents):', {
             totalIncome: totalIncome.value,
             totalExpenses: totalExpenses.value,
             totalTransactions: transactions.value.length,
@@ -282,10 +260,9 @@ export function useTransactionStore() {
                 tagStats[tag] = { count: 0, total: 0 };
             }
             tagStats[tag].count++;
-            // Handle amount field with standard column name
-            const amountStr = transaction.amount || '0';
-            const amount = parseFloat(amountStr.toString().replace(',', '.'));
-            tagStats[tag].total += amount;
+            // Amount is now stored in cents
+            const amountCents = transaction.amount || 0;
+            tagStats[tag].total += amountCents;
         });
 
         return tagStats;
@@ -487,19 +464,32 @@ export function useTransactionStore() {
     function enrichJsonWithCsvData(jsonTransactions, csvTransactions) {
         console.log(`🔄 Enriching ${jsonTransactions.length} JSON transactions with ${csvTransactions.length} CSV transactions`);
 
+        function isFirstWordInSecond(str1, str2) {
+            if (typeof str1 !== 'string' || typeof str2 !== 'string') return false;
+
+            // Check if strings are exactly the same
+            if (str1 === str2) return true;
+
+            // Extract substring before the first space (or the full string if no space)
+            const firstWord = str1.split(' ')[0];
+
+            // Check if it's included in the second string
+            return str2.includes(firstWord);
+        }
+
         // Simple matching function using amount, date, and description
         function findMatchingCsvTransaction(jsonTransaction, csvTransactions) {
-            const jsonAmount = jsonTransaction.amount?.toString().replace(',', '.');
+            const jsonAmount = jsonTransaction.amount; // Already in cents
             const jsonDate = jsonTransaction.date;
             const jsonDescription = jsonTransaction.description?.toLowerCase().trim();
 
             return csvTransactions.find((csvTransaction) => {
-                const csvAmount = csvTransaction.amount?.toString().replace(',', '.');
+                const csvAmount = csvTransaction.amount; // Already in cents
                 const csvDate = csvTransaction.date;
                 const csvDescription = csvTransaction.description?.toLowerCase().trim();
 
                 // Match on amount, date, and description
-                const result = jsonAmount === csvAmount && jsonDate === csvDate && jsonDescription === csvDescription;
+                const result = jsonAmount === csvAmount && jsonDate === csvDate && isFirstWordInSecond(jsonDescription, csvDescription);
                 return result;
             });
         }
@@ -549,7 +539,6 @@ export function useTransactionStore() {
                     json: jsonTransaction.originalData || jsonTransaction,
                     csv: matchingCsvTransaction.originalData || matchingCsvTransaction
                 };
-                const kal = enriched.balance;
                 return enriched;
             } else {
                 console.log(`⚠️ No CSV match found for: ${jsonTransaction.description} (${jsonTransaction.amount})`);
