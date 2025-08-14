@@ -45,15 +45,15 @@ export function useTransactionStore() {
             const saved = localStorage.getItem('customTags');
             if (saved) {
                 const customTags = JSON.parse(saved);
-                const customTagNames = customTags.map(tag => tag.name);
-                
+                const customTagNames = customTags.map((tag) => tag.name);
+
                 // Add custom tags to available tags if not already present
-                customTagNames.forEach(tagName => {
+                customTagNames.forEach((tagName) => {
                     if (!availableTags.value.includes(tagName)) {
                         availableTags.value.push(tagName);
                     }
                 });
-                
+
                 console.log('✅ Loaded custom tags into available tags:', customTagNames);
             }
         } catch (error) {
@@ -62,10 +62,14 @@ export function useTransactionStore() {
     }
 
     // Watch for changes in transactions and recalculate statistics
-    watch(transactions, () => {
-        console.log('🔄 Transactions changed, recalculating statistics...');
-        calculateStatistics();
-    }, { deep: true });
+    watch(
+        transactions.value,
+        () => {
+            console.log('🔄 Transactions changed, recalculating statistics...');
+            calculateStatistics();
+        },
+        { deep: true }
+    );
 
     // Computed properties
     const filteredTransactions = computed(() => {
@@ -163,7 +167,7 @@ export function useTransactionStore() {
 
     function updateTransactionTag(transactionId, tag) {
         console.log(`🔄 Updating tag for transaction ${transactionId} to: ${tag}`);
-        
+
         // Update tags object using transaction ID as key (now deterministic)
         if (tag) {
             tags.value[transactionId] = tag;
@@ -178,14 +182,14 @@ export function useTransactionStore() {
             // Create a new transaction object to ensure reactivity
             const updatedTransaction = { ...transactions.value[transactionIndex], tag };
             transactions.value[transactionIndex] = updatedTransaction;
-            
+
             console.log(`✅ Updated transaction at index ${transactionIndex}:`, {
                 id: transactionId,
                 oldTag: transactions.value[transactionIndex].tag,
                 newTag: tag,
                 description: updatedTransaction.description
             });
-            
+
             // Recalculate statistics after tag update
             calculateStatistics();
         } else {
@@ -212,13 +216,13 @@ export function useTransactionStore() {
     }
 
     function calculateStatistics() {
-        console.log('📊 Calculating statistics for', transactions.value.length, 'transactions');
-        console.log('📊 Transaction IDs in array:', transactions.value.map(t => t.id).slice(0, 10)); // Show first 10 IDs
+        // console.log('📊 Calculating statistics for', transactions.value.length, 'transactions');
+        // console.log('📊 Transaction IDs in array:', transactions.value.map(t => t.id).slice(0, 10)); // Show first 10 IDs
 
         let income = 0;
         let expenses = 0;
 
-        transactions.value.forEach((transaction, index) => {
+        filteredTransactions.value.forEach((transaction, index) => {
             // Handle amount field with standard column name
             const amountStr = transaction.amount || '0';
             const amount = parseFloat(amountStr.toString().replace(',', '.'));
@@ -227,15 +231,15 @@ export function useTransactionStore() {
             const debitCredit = transaction.debit_credit || '';
             const isIncome = debitCredit.trim().toLowerCase() === 'credit';
 
-            console.log(`Transaction ${index + 1}:`, {
-                amount: amountStr,
-                parsedAmount: amount,
-                isNaN: isNaN(amount),
-                debitCredit: debitCredit,
-                isIncome: isIncome,
-                description: transaction.description || 'No description',
-                allKeys: Object.keys(transaction)
-            });
+            // console.log(`Transaction ${index + 1}:`, {
+            //     amount: amountStr,
+            //     parsedAmount: amount,
+            //     isNaN: isNaN(amount),
+            //     debitCredit: debitCredit,
+            //     isIncome: isIncome,
+            //     description: transaction.description || 'No description',
+            //     allKeys: Object.keys(transaction)
+            // });
 
             if (isNaN(amount)) {
                 console.log(`  ⚠️ Skipping transaction with invalid amount: ${amountStr}`);
@@ -244,11 +248,11 @@ export function useTransactionStore() {
 
             if (isIncome) {
                 income += Math.abs(amount); // Use absolute value for consistency
-                console.log(`  → Added to income: ${Math.abs(amount)} (Total income now: ${income})`);
-                console.log(`  → INCOME TRANSACTION: ${transaction.description} | Amount: ${amountStr} | Debit/Credit: ${debitCredit}`);
+                // console.log(`  → Added to income: ${Math.abs(amount)} (Total income now: ${income})`);
+                // console.log(`  → INCOME TRANSACTION: ${transaction.description} | Amount: ${amountStr} | Debit/Credit: ${debitCredit}`);
             } else {
                 expenses += Math.abs(amount); // Use absolute value for consistency
-                console.log(`  → Added to expenses: ${Math.abs(amount)} (Total expenses now: ${expenses})`);
+                // console.log(`  → Added to expenses: ${Math.abs(amount)} (Total expenses now: ${expenses})`);
             }
         });
 
@@ -353,7 +357,7 @@ export function useTransactionStore() {
         console.log('🔍 Debug: Checking for duplicates in current transactions...');
         const ids = new Map();
         const duplicates = [];
-        
+
         transactions.value.forEach((transaction, index) => {
             if (ids.has(transaction.id)) {
                 const original = ids.get(transaction.id);
@@ -366,13 +370,13 @@ export function useTransactionStore() {
                 ids.set(transaction.id, { index, transaction });
             }
         });
-        
+
         if (duplicates.length > 0) {
             console.log(`🚨 Found ${duplicates.length} duplicate pairs:`, duplicates);
         } else {
             console.log('✅ No duplicates found in current transactions');
         }
-        
+
         return duplicates;
     }
 
@@ -431,7 +435,7 @@ export function useTransactionStore() {
 
                     // Apply saved tags to transactions using transaction IDs (now deterministic)
                     const savedTags = tags.value;
-                    transactions.value = transactions.value.map(transaction => ({
+                    transactions.value = transactions.value.map((transaction) => ({
                         ...transaction,
                         tag: savedTags[transaction.id] || transaction.tag || null
                     }));
@@ -479,75 +483,88 @@ export function useTransactionStore() {
         }
     }
 
-    function mergeTransactions(newTransactions) {
-        const existingTransactions = transactions.value;
-        
-        console.log(`🔄 Merging ${newTransactions.length} new transactions with ${existingTransactions.length} existing transactions`);
-        
-        // Use transaction IDs for duplicate detection since they are now deterministic
-        const existingIds = new Set(existingTransactions.map(t => t.id));
-        
-        console.log(`📋 Found ${existingIds.size} existing transaction IDs`);
+    // Simplified JSON-first approach: iterate through JSON and enrich with CSV data
+    function enrichJsonWithCsvData(jsonTransactions, csvTransactions) {
+        console.log(`🔄 Enriching ${jsonTransactions.length} JSON transactions with ${csvTransactions.length} CSV transactions`);
 
-        // Filter out duplicates based on transaction IDs
-        const newUniqueTransactions = [];
-        const duplicates = [];
-        
+        // Simple matching function using amount, date, and description
+        function findMatchingCsvTransaction(jsonTransaction, csvTransactions) {
+            const jsonAmount = jsonTransaction.amount?.toString().replace(',', '.');
+            const jsonDate = jsonTransaction.date;
+            const jsonDescription = jsonTransaction.description?.toLowerCase().trim();
 
-        
-        newTransactions.forEach((t, index) => {
-            if (existingIds.has(t.id)) {
-                console.log(`🚨 Duplicate found at index ${index}:`, {
-                    id: t.id,
-                    date: t.Date || t.date,
-                    amount: t.Amount || t.amount,
-                    description: t.Description || t.description
-                });
-                duplicates.push(t);
+            return csvTransactions.find((csvTransaction) => {
+                const csvAmount = csvTransaction.amount?.toString().replace(',', '.');
+                const csvDate = csvTransaction.date;
+                const csvDescription = csvTransaction.description?.toLowerCase().trim();
+
+                // Match on amount, date, and description
+                const result = jsonAmount === csvAmount && jsonDate === csvDate && jsonDescription === csvDescription;
+                return result;
+            });
+        }
+
+        // Debug: Check what fields are available in CSV transactions
+        if (csvTransactions.length > 0) {
+            console.log(`🔍 CSV transaction sample fields:`, Object.keys(csvTransactions[0]));
+            console.log(`🔍 CSV transaction sample:`, csvTransactions[0]);
+        }
+
+        // Enrich each JSON transaction
+        const enrichedTransactions = jsonTransactions.map((jsonTransaction) => {
+            const matchingCsvTransaction = findMatchingCsvTransaction(jsonTransaction, csvTransactions);
+
+            if (matchingCsvTransaction) {
+                console.log(`✅ Found CSV match for: ${jsonTransaction.description} (${jsonTransaction.amount})`);
+                console.log(`📊 CSV balance field:`, matchingCsvTransaction.balance);
+
+                // Create enriched transaction starting with JSON data
+                const enriched = { ...jsonTransaction };
+
+                // Add CSV-specific fields that don't exist in JSON
+                if (matchingCsvTransaction.account && !enriched.account) {
+                    enriched.account = matchingCsvTransaction.account;
+                }
+                if (matchingCsvTransaction.counterparty && !enriched.counterparty) {
+                    enriched.counterparty = matchingCsvTransaction.counterparty;
+                }
+                if (matchingCsvTransaction.code && !enriched.code) {
+                    enriched.code = matchingCsvTransaction.code;
+                }
+                if (matchingCsvTransaction.transaction_type && !enriched.transaction_type) {
+                    enriched.transaction_type = matchingCsvTransaction.transaction_type;
+                }
+                if (matchingCsvTransaction.notifications && !enriched.notifications) {
+                    enriched.notifications = matchingCsvTransaction.notifications;
+                }
+
+                // Always add balance from CSV if it exists (overwrite null values)
+                if (matchingCsvTransaction.balance) {
+                    enriched.balance = matchingCsvTransaction.balance;
+                    console.log(`💰 Added balance ${matchingCsvTransaction.balance} for: ${jsonTransaction.description}`);
+                }
+
+                // Store original data sources
+                enriched.originalData = {
+                    json: jsonTransaction.originalData || jsonTransaction,
+                    csv: matchingCsvTransaction.originalData || matchingCsvTransaction
+                };
+                const kal = enriched.balance;
+                return enriched;
             } else {
-                newUniqueTransactions.push(t);
-                existingIds.add(t.id); // Add to set to prevent duplicates within newTransactions
+                console.log(`⚠️ No CSV match found for: ${jsonTransaction.description} (${jsonTransaction.amount})`);
+                // Keep JSON transaction as is
+                if (!jsonTransaction.originalData) {
+                    jsonTransaction.originalData = { json: jsonTransaction };
+                }
+                return jsonTransaction;
             }
         });
 
-        if (duplicates.length > 0) {
-            console.log(`🚨 Found ${duplicates.length} duplicate transactions, skipping them`);
-        }
+        const matchedCount = enrichedTransactions.filter((t) => t.originalData && t.originalData.csv).length;
+        console.log(`📊 Enrichment complete: ${matchedCount} matched, ${enrichedTransactions.length - matchedCount} unmatched`);
 
-        if (newUniqueTransactions.length > 0) {
-            const mergedTransactions = [...existingTransactions, ...newUniqueTransactions];
-            transactions.value = mergedTransactions;
-            saveTransactionsToStorage(mergedTransactions);
-
-            // Use standard columns for consistent data table
-            availableColumns.value = getAllStandardColumns();
-
-            // Update visible columns to include any new standard columns
-            const newColumns = availableColumns.value.filter((col) => !visibleColumns.value.includes(col));
-            if (newColumns.length > 0) {
-                visibleColumns.value = [...visibleColumns.value, ...newColumns];
-            }
-
-            console.log(`✅ Added ${newUniqueTransactions.length} new transactions`);
-
-            // Calculate statistics after merging
-            calculateStatistics();
-
-            console.log(`📊 Merge complete: ${newUniqueTransactions.length} added, ${duplicates.length} duplicates, ${mergedTransactions.length} total`);
-
-            return {
-                added: newUniqueTransactions.length,
-                duplicates: duplicates.length,
-                total: mergedTransactions.length
-            };
-        }
-
-        console.log(`📊 Merge complete: 0 added, ${duplicates.length} duplicates, ${existingTransactions.length} total`);
-        return {
-            added: 0,
-            duplicates: duplicates.length,
-            total: existingTransactions.length
-        };
+        return enrichedTransactions;
     }
 
     function getLastUploadInfo() {
@@ -657,7 +674,7 @@ export function useTransactionStore() {
         setTransactions,
         loadSavedTransactions,
         saveTransactionsToStorage,
-        mergeTransactions,
+        enrichJsonWithCsvData,
         getLastUploadInfo,
         saveLastUploadInfo,
         loadColumnPreferences,

@@ -132,7 +132,7 @@ export function useMultiFormatParser() {
     // Determine tag based on category and subcategory with proper priority
     const determineTag = (category, subcategory, existingTag = null) => {
         console.log('🔍 Determining tag for:', { category, subcategory, existingTag });
-        
+
         // Priority 1: If there's already a tag, prioritize it
         if (existingTag && existingTag.trim()) {
             console.log('✅ Using existing tag:', existingTag.trim());
@@ -141,7 +141,7 @@ export function useMultiFormatParser() {
 
         // Priority 2: Try to map from category/subcategory combination
         const tagMapping = getTagMapping();
-        
+
         if (category && subcategory && tagMapping[category] && tagMapping[category][subcategory]) {
             const mappedTag = tagMapping[category][subcategory];
             console.log('🏷️ Mapped tag from category/subcategory:', mappedTag);
@@ -162,40 +162,7 @@ export function useMultiFormatParser() {
         return null;
     };
 
-    // Generate a unique fingerprint for duplicate detection
-    const generateTransactionFingerprint = (transaction) => {
-        // Always use the actual transaction data for fingerprinting, not the ID
-        // This ensures duplicates are detected even if they have different IDs
-        // Use lowercase field names as they are in the mapped transaction object
-        const date = transaction.date || transaction.Date || transaction.executionDate || '';
-        const amount = transaction.amount || transaction.Amount || (transaction.amount?.value || '');
-        const description = transaction.description || transaction.Description || transaction.subject || '';
 
-        // Create a normalized fingerprint based on key transaction data
-        let normalizedDate = date.toString().trim();
-        
-        // Normalize date format: convert YYYYMMDD to YYYY-MM-DD
-        if (normalizedDate.match(/^\d{8}$/)) {
-            // Format: YYYYMMDD -> YYYY-MM-DD
-            const year = normalizedDate.substring(0, 4);
-            const month = normalizedDate.substring(4, 6);
-            const day = normalizedDate.substring(6, 8);
-            normalizedDate = `${year}-${month}-${day}`;
-        }
-        // Normalize amount: replace comma with period for European decimal format
-        const normalizedAmount = amount.toString().trim().replace(',', '.');
-        const normalizedDescription = description.toString().trim().toLowerCase();
-
-        const hashString = `${normalizedDate}-${normalizedAmount}-${normalizedDescription}`;
-        
-        // Create a more robust hash that's consistent across different data sources
-        const hash = btoa(hashString)
-            
-
-        console.log('🔍 HASHES:');
-        console.log('🔍 hash:', hash);
-        return hash;
-    };
 
     // Parse JSON transaction format
     const parseJSONTransactions = (jsonText) => {
@@ -226,9 +193,8 @@ export function useMultiFormatParser() {
                 // Map to standard format
                 const standardTransaction = mapJSONToStandard(transaction);
                 
-                // Always generate a deterministic ID for consistency
-                // This ensures the same transaction always gets the same ID
-                standardTransaction.id = generateTransactionId(transaction);
+                // Use the original JSON ID as the single source of truth
+                standardTransaction.id = transaction.id;
                 
                 // Store original data for reference
                 standardTransaction.originalData = transaction;
@@ -246,14 +212,12 @@ export function useMultiFormatParser() {
     const parseCSVTransactions = (csvText) => {
         try {
             parseError.value = null;
-            
             const parsedData = parseCSV(csvText);
 
-            
             const transactions = parsedData.map(transaction => {
                 // Map to standard format
                 const standardTransaction = mapCSVToStandard(transaction);
-                
+
                 // Always generate a deterministic ID for consistency
                 // This ensures the same transaction always gets the same ID
                 standardTransaction.id = generateTransactionId(standardTransaction);
@@ -263,8 +227,6 @@ export function useMultiFormatParser() {
 
                 return standardTransaction;
             });
-            
-
             
             return transactions;
         } catch (error) {
@@ -326,11 +288,8 @@ export function useMultiFormatParser() {
                 transactions = parseCSVTransactions(fileContent);
             }
             
-            // Remove duplicates within the parsed transactions
-            const { unique: deduplicatedTransactions } = removeDuplicates(transactions);
-            
             // Post-process transactions for tag assignment
-            return postProcessTransactions(deduplicatedTransactions);
+            return postProcessTransactions(transactions);
         } catch (error) {
             parseError.value = error.message;
             console.error('Transaction parsing error:', error);
@@ -338,51 +297,7 @@ export function useMultiFormatParser() {
         }
     };
 
-    // Remove duplicates from transactions
-    const removeDuplicates = (transactions) => {
-        const seen = new Map(); // Use Map to store fingerprint -> first occurrence
-        const unique = [];
-        const duplicates = [];
 
-        console.log(`🔍 Checking ${transactions.length} transactions for duplicates...`);
-
-        transactions.forEach((transaction, index) => {
-            const fingerprint = generateTransactionFingerprint(transaction);
-            
-
-            
-            if (seen.has(fingerprint)) {
-                const originalTransaction = seen.get(fingerprint);
-                console.log(`🚨 Duplicate found at index ${index}:`, {
-                    original: {
-                        date: originalTransaction.Date || originalTransaction.date,
-                        amount: originalTransaction.Amount || originalTransaction.amount,
-                        description: originalTransaction.Description || originalTransaction.description,
-                        id: originalTransaction.id
-                    },
-                    duplicate: {
-                        date: transaction.Date || transaction.date,
-                        amount: transaction.Amount || transaction.amount,
-                        description: transaction.Description || transaction.description,
-                        id: transaction.id
-                    },
-                    fingerprint
-                });
-                duplicates.push(transaction);
-            } else {
-                seen.set(fingerprint, transaction);
-                unique.push(transaction);
-            }
-        });
-
-        console.log(`✅ Duplicate detection complete: ${unique.length} unique, ${duplicates.length} duplicates`);
-
-        return {
-            unique,
-            duplicates,
-            duplicateCount: duplicates.length
-        };
-    };
 
     // Get all available categories from tag mapping
     const getAvailableCategories = () => {
@@ -444,8 +359,6 @@ export function useMultiFormatParser() {
         parseJSONTransactions,
         parseCSVTransactions,
         postProcessTransactions,
-        removeDuplicates,
-        generateTransactionFingerprint,
         determineTag,
         updateTagMapping,
         getTagMapping,

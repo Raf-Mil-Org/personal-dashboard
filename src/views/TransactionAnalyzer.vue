@@ -12,6 +12,7 @@ import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
 import FileUpload from 'primevue/fileupload';
 import InputText from 'primevue/inputtext';
+import Calendar from 'primevue/calendar';
 import SelectButton from 'primevue/selectbutton';
 import Tag from 'primevue/tag';
 import Toast from 'primevue/toast';
@@ -19,7 +20,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useToast } from 'primevue/usetoast';
 
 // Composables
-const { parseTransactions, removeDuplicates, parseError } = useMultiFormatParser();
+const { parseTransactions, parseError } = useMultiFormatParser();
 const toast = useToast();
 const {
     transactions,
@@ -38,11 +39,11 @@ const {
     loadTags,
     loadCustomTags,
     updateTransactionTag,
-    getTagStatistics,
+
     exportTaggedData,
     setTransactions,
     loadSavedTransactions,
-    mergeTransactions,
+    enrichJsonWithCsvData,
     saveLastUploadInfo,
     getLastUploadInfo,
     clearAllData,
@@ -57,40 +58,15 @@ const showDocumentation = ref(false);
 const searchTerm = ref(''); // Search term for filtering transactions
 const customTags = ref([]); // Custom tags for color mapping
 
-const netAmount2 = computed(() => {
-    return incomes.value - expenses.value;
-});
+// Date filtering state
+const startDate = ref(null);
+const endDate = ref(null);
 
-const transactionsNumber = computed(() => {
-    return searchFilteredTransactions.value.length;
-});
-
-const expenses = computed(() => {
-    let sum = 0;
-    const temp = searchFilteredTransactions.value.filter((transaction) => transaction.debit_credit === 'debit').map((transaction) => transaction.amount);
-    temp.forEach((amount) => {
-        const amount2 = amount.replace('-', '');
-        sum += parseFloat(amount2);
-    });
-    return sum;
-});
-
-const incomes = computed(() => {
-    let sum = 0;
-    const temp = searchFilteredTransactions.value.filter((transaction) => transaction.debit_credit === 'credit').map((transaction) => transaction.amount);
-    temp.forEach((amount) => {
-        const amount2 = amount.replace('-', '');
-        sum += parseFloat(amount2);
-    });
-
-    // const kalerer = searchFilteredTransactions.value.find((transaction) => transaction.description === 'ABN AMRO BANK');
-    const kalerer = searchFilteredTransactions.value.findIndex((transaction) => transaction.description === 'ABN AMRO BANK');
-    console.log(kalerer);
-    console.log(kalerer);
-    const previousBalance = searchFilteredTransactions.value[kalerer];
-    // return previousBalance;
-    return sum;
-});
+// JSON-first approach state
+const jsonTransactions = ref([]);
+const csvTransactions = ref([]);
+const hasJsonUploaded = ref(false);
+const hasCsvUploaded = ref(false);
 
 // Methods
 const onFileSelect = async (event) => {
@@ -106,40 +82,60 @@ const onFileSelect = async (event) => {
         const parsedData = parseTransactions(text, file.name);
         console.log('Parsed data (first 2 rows):', parsedData.slice(0, 2));
 
-        // Remove duplicates from the parsed data
-        const { unique, duplicateCount } = removeDuplicates(parsedData);
-
-        if (duplicateCount > 0) {
-            console.log(`Found ${duplicateCount} duplicates in uploaded file`);
-        }
-
         // Process transactions with existing tags using transaction IDs (now deterministic)
-        const processedTransactions = unique.map((transaction) => ({
+        const processedTransactionsWithTags = parsedData.map((transaction) => ({
             ...transaction,
             tag: loadTags()[transaction.id] || transaction.tag || null
         }));
 
-        // Check if we have existing transactions and merge them
-        if (transactions.value.length > 0) {
-            const result = mergeTransactions(processedTransactions);
+        // JSON-first approach: Store transactions based on file type
+        console.log(`📁 Processing ${file.name} (${file.name.toLowerCase().endsWith('.json') ? 'JSON' : 'CSV'})`);
 
-            // Show user feedback about the merge
-            console.log(`Upload complete! Added: ${result.added} new transactions, Duplicates skipped: ${result.duplicates}, Total: ${result.total}`);
-        } else {
-            // First upload - set transactions directly
-            setTransactions(processedTransactions);
-            console.log(`Upload complete! Added: ${processedTransactions.length} transactions`);
+        if (file.name.toLowerCase().endsWith('.json')) {
+            jsonTransactions.value = processedTransactionsWithTags;
+            hasJsonUploaded.value = true;
+            console.log('📋 JSON transactions stored:', jsonTransactions.value.length);
+
+            // If CSV is already uploaded, enrich JSON with CSV data
+            if (hasCsvUploaded.value) {
+                console.log('🔄 Enriching JSON with CSV data...');
+                const enrichedTransactions = enrichJsonWithCsvData(jsonTransactions.value, csvTransactions.value);
+                setTransactions(enrichedTransactions);
+                console.log('✅ Enriched transactions set:', enrichedTransactions.length);
+            } else {
+                // Set JSON transactions as base
+                setTransactions(jsonTransactions.value);
+                console.log('✅ JSON transactions set as base:', jsonTransactions.value.length);
+            }
+        } else if (file.name.toLowerCase().endsWith('.csv')) {
+            csvTransactions.value = processedTransactionsWithTags;
+            hasCsvUploaded.value = true;
+            console.log('📋 CSV transactions stored:', csvTransactions.value.length);
+
+            // If JSON is already uploaded, enrich JSON with CSV data
+            if (hasJsonUploaded.value) {
+                console.log('🔄 Enriching JSON with CSV data...');
+                console.log('📊 Before enrichment - JSON count:', jsonTransactions.value.length, 'CSV count:', csvTransactions.value.length);
+                const enrichedTransactions = enrichJsonWithCsvData(jsonTransactions.value, csvTransactions.value);
+                setTransactions(enrichedTransactions);
+                console.log('✅ Enriched transactions set:', enrichedTransactions.length);
+                console.log('📊 After enrichment - Total transactions:', transactions.value.length);
+            } else {
+                // Set CSV transactions as base (fallback)
+                setTransactions(csvTransactions.value);
+                console.log('⚠️ CSV transactions set as base (JSON not uploaded yet):', csvTransactions.value.length);
+            }
         }
 
         // Save upload info
-        saveLastUploadInfo(file.name, processedTransactions.length);
+        saveLastUploadInfo(file.name, processedTransactionsWithTags.length);
 
         // Debug: Log the state after setting transactions
         console.log('Available columns:', availableColumns.value);
         console.log('Visible columns:', visibleColumns.value);
 
-        console.log('Successfully processed', processedTransactions.length, 'transactions');
-        console.log('First transaction:', processedTransactions[0]);
+        console.log('Successfully processed', processedTransactionsWithTags.length, 'transactions');
+        console.log('First transaction:', processedTransactionsWithTags[0]);
     } catch (error) {
         console.error('Error parsing file:', error);
         console.error('Error parsing file: ' + error.message);
@@ -178,6 +174,12 @@ const clearSearch = () => {
     console.log('🔍 Search cleared');
 };
 
+const clearDateFilters = () => {
+    startDate.value = null;
+    endDate.value = null;
+    console.log('📅 Date filters cleared');
+};
+
 const loadCustomTagsForColors = () => {
     try {
         const saved = localStorage.getItem('customTags');
@@ -197,6 +199,11 @@ const confirmClearData = () => {
 
 const handleClearData = () => {
     clearAllData();
+    // Clear JSON-first approach state
+    jsonTransactions.value = [];
+    csvTransactions.value = [];
+    hasJsonUploaded.value = false;
+    hasCsvUploaded.value = false;
     showClearDataDialog.value = false;
     console.log('All data has been cleared successfully!');
 };
@@ -253,28 +260,98 @@ const formatFieldValue = (field, value) => {
 };
 
 // Computed properties for statistics
-const totalTransactions = computed(() => filteredTransactions.value.length);
 
-// Computed property for search-filtered transactions
-const searchFilteredTransactions = computed(() => {
-    if (!searchTerm.value.trim()) {
-        return filteredTransactions.value;
+// Helper function to check if a date is within the selected range
+const isDateInRange = (transactionDate) => {
+    if (!startDate.value && !endDate.value) {
+        return true; // No date filter applied
     }
 
-    const searchLower = searchTerm.value.toLowerCase().trim();
+    if (!transactionDate) {
+        return false; // No date in transaction
+    }
 
-    return filteredTransactions.value.filter((transaction) => {
-        // Search in multiple fields
-        const searchableFields = [transaction.description, transaction.tag, transaction.category, transaction.subcategory, transaction.amount, transaction.date, transaction.account, transaction.counterparty]
-            .filter((field) => field != null)
-            .map((field) => field.toString().toLowerCase());
+    // Convert transaction date to Date object
+    let transactionDateObj;
+    if (typeof transactionDate === 'string') {
+        // Handle YYYYMMDD format
+        if (transactionDate.match(/^\d{8}$/)) {
+            const year = transactionDate.substring(0, 4);
+            const month = transactionDate.substring(4, 6);
+            const day = transactionDate.substring(6, 8);
+            transactionDateObj = new Date(`${year}-${month}-${day}`);
+        } else {
+            transactionDateObj = new Date(transactionDate);
+        }
+    } else {
+        transactionDateObj = new Date(transactionDate);
+    }
 
-        return searchableFields.some((field) => field.includes(searchLower));
-    });
+    if (isNaN(transactionDateObj.getTime())) {
+        return false; // Invalid date
+    }
+
+    // Check start date
+    if (startDate.value) {
+        const startDateObj = new Date(startDate.value);
+        if (transactionDateObj < startDateObj) {
+            return false;
+        }
+    }
+
+    // Check end date
+    if (endDate.value) {
+        const endDateObj = new Date(endDate.value);
+        endDateObj.setHours(23, 59, 59, 999); // Include the entire end date
+        if (transactionDateObj > endDateObj) {
+            return false;
+        }
+    }
+
+    return true;
+};
+
+// Computed property for search and date filtered transactions
+const searchFilteredTransactions = computed(() => {
+    let filtered = filteredTransactions.value;
+
+    // Apply date filtering first
+    filtered = filtered.filter((transaction) => isDateInRange(transaction.date));
+
+    // Apply search filtering
+    if (searchTerm.value.trim()) {
+        const searchLower = searchTerm.value.toLowerCase().trim();
+
+        filtered = filtered.filter((transaction) => {
+            // Search in multiple fields
+            const searchableFields = [transaction.description, transaction.tag, transaction.category, transaction.subcategory, transaction.amount, transaction.date, transaction.account, transaction.counterparty]
+                .filter((field) => field != null)
+                .map((field) => field.toString().toLowerCase());
+
+            return searchableFields.some((field) => field.includes(searchLower));
+        });
+    }
+
+    return filtered;
 });
 
+// Computed property for tag statistics based on date-filtered transactions
 const tagStatistics = computed(() => {
-    return getTagStatistics();
+    const tagStats = {};
+
+    searchFilteredTransactions.value.forEach((transaction) => {
+        const tag = transaction.tag || 'Untagged';
+        if (!tagStats[tag]) {
+            tagStats[tag] = { count: 0, total: 0 };
+        }
+        tagStats[tag].count++;
+        // Handle amount field with standard column name
+        const amountStr = transaction.amount || '0';
+        const amount = parseFloat(amountStr.toString().replace(',', '.'));
+        tagStats[tag].total += amount;
+    });
+
+    return tagStats;
 });
 
 // Lifecycle
@@ -334,7 +411,23 @@ watch(
 
         <!-- File Upload Section -->
         <div class="card mb-6">
-            <h2 class="text-xl font-semibold mb-4">📥 Upload Transaction File</h2>
+            <h2 class="text-xl font-semibold mb-4">📥 Upload Transaction File (JSON-First Approach)</h2>
+
+            <!-- Upload Status -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-4 text-sm">
+                    <div class="flex items-center gap-2">
+                        <i class="pi" :class="hasJsonUploaded ? 'pi-check-circle text-green-600' : 'pi-circle text-gray-400'"></i>
+                        <span :class="hasJsonUploaded ? 'text-green-700' : 'text-gray-600'">JSON Base Data</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class="pi" :class="hasCsvUploaded ? 'pi-check-circle text-green-600' : 'pi-circle text-gray-400'"></i>
+                        <span :class="hasCsvUploaded ? 'text-green-700' : 'text-gray-600'">CSV Enrichment</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Upload JSON first for best results, then CSV to enrich with additional details</p>
+            </div>
+
             <div class="mb-4">
                 <p class="text-gray-600 mb-2">Supported formats:</p>
                 <ul class="text-sm text-gray-600 list-disc list-inside mb-4">
@@ -362,19 +455,19 @@ watch(
             <h3 class="text-lg font-semibold mb-4">📈 Summary Statistics</h3>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-blue-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-blue-600">{{ transactionsNumber }}</div>
+                    <div class="text-2xl font-bold text-blue-600">{{ transactions.length }}</div>
                     <div class="text-sm text-blue-800">Total Transactions</div>
                 </div>
                 <div class="bg-green-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-green-600">{{ formatCurrency(incomes) }}</div>
+                    <div class="text-2xl font-bold text-green-600">{{ formatCurrency(totalIncome) }}</div>
                     <div class="text-sm text-green-800">Total Income</div>
                 </div>
                 <div class="bg-red-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-red-600">{{ formatCurrency(expenses) }}</div>
+                    <div class="text-2xl font-bold text-red-600">{{ formatCurrency(totalExpenses) }}</div>
                     <div class="text-sm text-red-800">Total Expenses</div>
                 </div>
                 <div class="bg-purple-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(netAmount2) }}</div>
+                    <div class="text-2xl font-bold text-purple-600">{{ formatCurrency(netAmount) }}</div>
                     <div class="text-sm text-purple-800">Net Amount</div>
                 </div>
             </div>
@@ -412,23 +505,40 @@ watch(
                 <h3 class="text-lg font-semibold mb-4">📊 Transaction Data</h3>
 
                 <!-- Search and Filter Controls -->
-                <div class="flex flex-col md:flex-row gap-4 mb-4">
-                    <div class="flex items-center gap-3">
-                        <SelectButton v-model="selectedFilter" :options="filterOptions" optionLabel="label" optionValue="value" />
-                        <Button v-if="searchTerm" @click="clearSearch" icon="pi pi-times" text size="small" v-tooltip.top="'Clear search'" />
+                <div class="flex flex-col gap-4 mb-4">
+                    <!-- Date Range Filter -->
+                    <div class="flex flex-col md:flex-row gap-4 items-center">
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-700">Date Range:</label>
+                            <Calendar v-model="startDate" placeholder="Start Date" dateFormat="yy-mm-dd" :showIcon="true" class="w-40" />
+                            <span class="text-gray-500">to</span>
+                            <Calendar v-model="endDate" placeholder="End Date" dateFormat="yy-mm-dd" :showIcon="true" class="w-40" />
+                            <Button v-if="startDate || endDate" @click="clearDateFilters" icon="pi pi-times" text size="small" v-tooltip.top="'Clear date filters'" class="text-red-500" />
+                        </div>
                     </div>
-                    <div class="flex justify-end">
-                        <IconField>
-                            <InputIcon>
-                                <i class="pi pi-search" />
-                            </InputIcon>
-                            <InputText v-model="searchTerm" placeholder="Keyword Search" />
-                        </IconField>
+
+                    <!-- Search and Tag Filter -->
+                    <div class="flex flex-col md:flex-row gap-4 justify-between">
+                        <div class="flex items-center gap-3">
+                            <SelectButton v-model="selectedFilter" :options="filterOptions" optionLabel="label" optionValue="value" />
+                            <Button v-if="searchTerm" @click="clearSearch" icon="pi pi-times" text size="small" v-tooltip.top="'Clear search'" />
+                        </div>
+                        <div class="flex justify-end">
+                            <IconField>
+                                <InputIcon>
+                                    <i class="pi pi-search" />
+                                </InputIcon>
+                                <InputText v-model="searchTerm" placeholder="Keyword Search" />
+                            </IconField>
+                        </div>
                     </div>
                 </div>
 
                 <div class="mb-4 flex justify-between items-center">
-                    <div class="text-sm text-gray-600">Showing {{ searchFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)</div>
+                    <div class="text-sm text-gray-600">
+                        Showing {{ searchFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)
+                        <span v-if="startDate || endDate" class="text-blue-600"> • Date filtered: {{ startDate ? formatDate(startDate) : 'Any' }} to {{ endDate ? formatDate(endDate) : 'Any' }} </span>
+                    </div>
                     <div class="flex items-center gap-3">
                         <Button label="Debug Duplicates" icon="pi pi-search" @click="debugCheckDuplicates" size="small" v-tooltip.top="'Check for duplicates in current transactions'" />
                         <Button label="Export Tagged Data" icon="pi pi-download" @click="exportTaggedData" size="small" />
@@ -436,10 +546,9 @@ watch(
                     </div>
                 </div>
 
-                <!-- <p>{{ JSON.stringify(transactions) }}</p> -->
-                <p>Expenses: {{ expenses }}</p>
-                <p>Incomes: {{ incomes }}</p>
-                <!-- <p>{{ searchFilteredTransactions.filter((transaction) => transaction.debit_credit === 'debit').map((transaction) => transaction.amount) }}</p> -->
+                <p v-for="value in searchFilteredTransactions.map((transaction) => transaction.amount)" :key="value">{{ `${value}` }}</p>
+                <!-- <p>{{ JSON.stringify(Object.keys(searchFilteredTransactions[0])) }}</p> -->
+                <!-- <p v-for="value in Object.keys(searchFilteredTransactions[0])" :key="value">{{ `${value}: ${searchFilteredTransactions[0][value]}` }}</p> -->
                 <DataTable
                     :key="`transactions-${tableKey}`"
                     :value="searchFilteredTransactions"
