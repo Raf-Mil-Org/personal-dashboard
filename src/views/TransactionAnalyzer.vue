@@ -48,7 +48,9 @@ const {
     saveLastUploadInfo,
     getLastUploadInfo,
     clearAllData,
-    debugCheckDuplicates
+    debugCheckDuplicates,
+    getPersistentCounts,
+    resetPersistentCounts
 } = useTransactionStore();
 
 // Local state
@@ -362,6 +364,11 @@ const tagStatistics = computed(() => {
     return tagStats;
 });
 
+// Persistent counts display
+const persistentCounts = computed(() => {
+    return getPersistentCounts();
+});
+
 // Lifecycle
 onMounted(() => {
     console.log('TransactionAnalyzer mounted - starting to load data...');
@@ -455,6 +462,8 @@ watch(
             <div class="mt-4 flex gap-3">
                 <Button label="Manage Tag Mappings" icon="pi pi-cog" @click="$router.push('/tag-mapping-manager')" size="small" class="bg-blue-500 hover:bg-blue-600" />
                 <Button label="View Documentation" icon="pi pi-info-circle" @click="showDocumentation = true" size="small" class="bg-gray-500 hover:bg-gray-600" />
+                <Button label="Log Persistent Counts" icon="pi pi-chart-bar" @click="() => console.log('📊 Persistent Counts:', getPersistentCounts())" size="small" class="bg-yellow-500 hover:bg-yellow-600" />
+                <Button label="Reset Persistent Counts" icon="pi pi-refresh" @click="resetPersistentCounts" size="small" class="bg-red-500 hover:bg-red-600" />
             </div>
         </div>
 
@@ -479,6 +488,26 @@ watch(
                     <div class="text-sm text-purple-800">Net Amount</div>
                 </div>
             </div>
+        </div>
+
+        <!-- Persistent Transaction Counts -->
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-4">📊 Persistent Transaction Counts</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-orange-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-orange-600">{{ persistentCounts.totalJsonTransactions }}</div>
+                    <div class="text-sm text-orange-800">Total JSON Transactions</div>
+                </div>
+                <div class="bg-teal-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-teal-600">{{ persistentCounts.totalCsvTransactions }}</div>
+                    <div class="text-sm text-teal-800">Total CSV Transactions</div>
+                </div>
+                <div class="bg-indigo-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-indigo-600">{{ persistentCounts.totalDatatableTransactions }}</div>
+                    <div class="text-sm text-indigo-800">Total Datatable Transactions</div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">These counts persist across data clearing and track unique transactions processed</p>
         </div>
 
         <!-- Tag Statistics -->

@@ -11,6 +11,13 @@ const STORAGE_KEYS = {
     LAST_UPLOAD: 'transaction_analyzer_last_upload'
 };
 
+// Persistent storage keys (never deleted)
+const PERSISTENT_STORAGE_KEYS = {
+    TOTAL_JSON_TRANSACTIONS: 'transaction_analyzer_persistent_total_json',
+    TOTAL_CSV_TRANSACTIONS: 'transaction_analyzer_persistent_total_csv',
+    TOTAL_DATATABLE_TRANSACTIONS: 'transaction_analyzer_persistent_total_datatable'
+};
+
 // Predefined tags
 const DEFAULT_TAGS = ['Groceries', 'Utilities', 'Dining', 'Transport', 'Health', 'Entertainment', 'Subscriptions', 'Housing', 'Other'];
 
@@ -38,6 +45,55 @@ export function useTransactionStore() {
 
     // Available tags for dropdown
     const availableTags = ref([...DEFAULT_TAGS]);
+
+    // Persistent transaction count tracking functions
+    function getPersistentCount(key) {
+        try {
+            const saved = localStorage.getItem(PERSISTENT_STORAGE_KEYS[key]);
+            return saved ? parseInt(saved, 10) : 0;
+        } catch (error) {
+            console.error(`Error loading persistent count for ${key}:`, error);
+            return 0;
+        }
+    }
+
+    function updatePersistentCount(key, newCount) {
+        try {
+            const currentCount = getPersistentCount(key);
+            const updatedCount = currentCount + newCount;
+            localStorage.setItem(PERSISTENT_STORAGE_KEYS[key], updatedCount.toString());
+            console.log(`📊 Updated persistent count for ${key}: ${currentCount} + ${newCount} = ${updatedCount}`);
+            return updatedCount;
+        } catch (error) {
+            console.error(`Error updating persistent count for ${key}:`, error);
+            return 0;
+        }
+    }
+
+    function getPersistentCounts() {
+        return {
+            totalJsonTransactions: getPersistentCount('TOTAL_JSON_TRANSACTIONS'),
+            totalCsvTransactions: getPersistentCount('TOTAL_CSV_TRANSACTIONS'),
+            totalDatatableTransactions: getPersistentCount('TOTAL_DATATABLE_TRANSACTIONS')
+        };
+    }
+
+    function logPersistentCounts() {
+        const counts = getPersistentCounts();
+        console.log('📊 Persistent Transaction Counts:', counts);
+        return counts;
+    }
+
+    function resetPersistentCounts() {
+        try {
+            localStorage.removeItem(PERSISTENT_STORAGE_KEYS.TOTAL_JSON_TRANSACTIONS);
+            localStorage.removeItem(PERSISTENT_STORAGE_KEYS.TOTAL_CSV_TRANSACTIONS);
+            localStorage.removeItem(PERSISTENT_STORAGE_KEYS.TOTAL_DATATABLE_TRANSACTIONS);
+            console.log('🔄 Reset all persistent transaction counts');
+        } catch (error) {
+            console.error('Error resetting persistent counts:', error);
+        }
+    }
 
     // Load custom tags and update available tags
     function loadCustomTags() {
@@ -359,6 +415,19 @@ export function useTransactionStore() {
 
     function setTransactions(newTransactions) {
         console.log('🔄 Setting transactions:', newTransactions.length);
+
+        // Track new datatable transactions (avoid duplicates)
+        const existingTransactionIds = new Set(transactions.value.map((t) => t.id));
+
+        // Count only truly new transactions
+        const newUniqueTransactions = newTransactions.filter((t) => !existingTransactionIds.has(t.id));
+        const newCount = newUniqueTransactions.length;
+
+        if (newCount > 0) {
+            updatePersistentCount('TOTAL_DATATABLE_TRANSACTIONS', newCount);
+            console.log(`📊 Added ${newCount} new unique transactions to datatable`);
+        }
+
         transactions.value = newTransactions;
 
         // Use standard columns for consistent data table
@@ -377,6 +446,9 @@ export function useTransactionStore() {
 
         // Calculate statistics
         calculateStatistics();
+
+        // Log current persistent counts
+        logPersistentCounts();
     }
 
     function loadSavedTransactions() {
@@ -683,6 +755,10 @@ export function useTransactionStore() {
 
         // API stubs
         saveColumnPreferencesToBackend,
-        saveTagsToBackend
+        saveTagsToBackend,
+
+        // Persistent tracking functions
+        getPersistentCounts,
+        resetPersistentCounts
     };
 }

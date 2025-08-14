@@ -6,90 +6,110 @@ export function useMultiFormatParser() {
     const { parseCSV, generateTransactionId } = useCSVParser();
     const parseError = ref(null);
 
+    // Persistent storage keys for transaction counting
+    const PERSISTENT_STORAGE_KEYS = {
+        TOTAL_JSON_TRANSACTIONS: 'transaction_analyzer_persistent_total_json',
+        TOTAL_CSV_TRANSACTIONS: 'transaction_analyzer_persistent_total_csv'
+    };
+
+    // Helper functions for persistent transaction counting
+    const updatePersistentCount = (key, newCount) => {
+        try {
+            const currentCount = parseInt(localStorage.getItem(PERSISTENT_STORAGE_KEYS[key]) || '0', 10);
+            const updatedCount = currentCount + newCount;
+            localStorage.setItem(PERSISTENT_STORAGE_KEYS[key], updatedCount.toString());
+            console.log(`📊 Updated persistent count for ${key}: ${currentCount} + ${newCount} = ${updatedCount}`);
+            return updatedCount;
+        } catch (error) {
+            console.error(`Error updating persistent count for ${key}:`, error);
+            return 0;
+        }
+    };
+
     // Default tag mapping for category/subcategory combinations based on structured data
     const defaultTagMapping = {
         'Fixed expenses': {
             'Housing costs': 'Housing',
-            'Daycare': 'Other',
-            'Insurance': 'Utilities',
-            'Utilities': 'Utilities',
-            'Loans': 'Other',
-            'Other': 'Other'
+            Daycare: 'Other',
+            Insurance: 'Utilities',
+            Utilities: 'Utilities',
+            Loans: 'Other',
+            Other: 'Other'
         },
         'Free time': {
             'Activities & events': 'Entertainment',
-            'Sport': 'Health',
-            'Hobbies': 'Entertainment',
-            'Holidays': 'Entertainment',
+            Sport: 'Health',
+            Hobbies: 'Entertainment',
+            Holidays: 'Entertainment',
             'Books & magazines': 'Entertainment',
-            'Games': 'Entertainment',
-            'Music': 'Entertainment',
-            'Movies': 'Entertainment',
-            'Lottery': 'Entertainment',
-            'Other': 'Entertainment'
+            Games: 'Entertainment',
+            Music: 'Entertainment',
+            Movies: 'Entertainment',
+            Lottery: 'Entertainment',
+            Other: 'Entertainment'
         },
         'Groceries & household': {
-            'Groceries': 'Groceries',
+            Groceries: 'Groceries',
             'House & garden': 'Groceries',
-            'Pets': 'Groceries',
-            'Other': 'Groceries'
+            Pets: 'Groceries',
+            Other: 'Groceries'
         },
         'Health & Wellness': {
             'Medical expenses': 'Health',
             'Pharmacy & drugstore': 'Health',
-            'Wellness': 'Health',
+            Wellness: 'Health',
             'Beauty & hair care': 'Health',
-            'Other': 'Health'
+            Other: 'Health'
         },
-        'Other': {
+        Other: {
             'Cash withdrawal': 'Other',
             'Credit card': 'Other',
-            'Transfers': 'Other',
-            'Charity': 'Other',
-            'Education': 'Other',
-            'Fines': 'Other',
-            'Taxes': 'Other',
+            Transfers: 'Other',
+            Charity: 'Other',
+            Education: 'Other',
+            Fines: 'Other',
+            Taxes: 'Other',
             'Extra loan repayment': 'Other',
             'Extra mortgage repayment': 'Other',
-            'Savings': 'Other',
-            'Investment': 'Other',
+            Savings: 'Other',
+            Investment: 'Other',
             'Business expenses': 'Other',
-            'Other': 'Other'
+            Other: 'Other'
         },
         'Restaurants & bars': {
-            'Bars': 'Dining',
+            Bars: 'Dining',
             'Coffee bars': 'Dining',
-            'Snacks': 'Dining',
-            'Lunch': 'Dining',
-            'Restaurants': 'Dining',
-            'Other': 'Dining'
+            Snacks: 'Dining',
+            Lunch: 'Dining',
+            Restaurants: 'Dining',
+            Other: 'Dining'
         },
-        'Shopping': {
-            'Clothes': 'Shopping',
-            'Accessories': 'Shopping',
+        Shopping: {
+            Clothes: 'Shopping',
+            Accessories: 'Shopping',
             'Software & electronics': 'Shopping',
             'Online shopping': 'Shopping',
-            'Gifts': 'Shopping',
-            'Other': 'Shopping'
+            Gifts: 'Shopping',
+            Other: 'Shopping'
         },
         'Transport & travel': {
-            'Car': 'Transport',
-            'Fuel': 'Transport',
-            'Parking': 'Transport',
+            Car: 'Transport',
+            Fuel: 'Transport',
+            Parking: 'Transport',
             'Public transport': 'Transport',
             'Flight tickets': 'Transport',
-            'Taxi': 'Transport',
-            'Bicycle': 'Transport',
-            'Other': 'Transport'
+            Taxi: 'Transport',
+            Bicycle: 'Transport',
+            Other: 'Transport'
         },
         'Group this yourself': {
             'Group this yourself': 'Other'
         },
         'To your accounts': {
-            'Savings': 'Other',
+            Savings: 'Other',
             'Joint account': 'Other',
             'Investment account': 'Other',
-            'Other': 'Other'
+            Other: 'Other'
         }
     };
 
@@ -162,21 +182,19 @@ export function useMultiFormatParser() {
         return null;
     };
 
-
-
     // Parse JSON transaction format
     const parseJSONTransactions = (jsonText) => {
         try {
             parseError.value = null;
-            
+
             const data = JSON.parse(jsonText);
-            
+
             if (!data.transactions || !Array.isArray(data.transactions)) {
                 throw new Error('Invalid JSON format: missing or invalid "transactions" array');
             }
 
             console.log('🔍 JSON parsing - Total transactions in array:', data.transactions.length);
-            
+
             return data.transactions.map((transaction, index) => {
                 // Debug: Log transaction details
                 if (index < 5 || transaction.amount?.value === '7822.45' || transaction.amount?.value === '8548.11') {
@@ -189,13 +207,13 @@ export function useMultiFormatParser() {
                         hasValue: !!transaction.amount?.value
                     });
                 }
-                
+
                 // Map to standard format
                 const standardTransaction = mapJSONToStandard(transaction);
-                
+
                 // Use the original JSON ID as the single source of truth
                 standardTransaction.id = transaction.id;
-                
+
                 // Store original data for reference
                 standardTransaction.originalData = transaction;
 
@@ -214,20 +232,20 @@ export function useMultiFormatParser() {
             parseError.value = null;
             const parsedData = parseCSV(csvText);
 
-            const transactions = parsedData.map(transaction => {
+            const transactions = parsedData.map((transaction) => {
                 // Map to standard format
                 const standardTransaction = mapCSVToStandard(transaction);
 
                 // Always generate a deterministic ID for consistency
                 // This ensures the same transaction always gets the same ID
                 standardTransaction.id = generateTransactionId(standardTransaction);
-                
+
                 // Store original data for reference
                 standardTransaction.originalData = transaction;
 
                 return standardTransaction;
             });
-            
+
             return transactions;
         } catch (error) {
             parseError.value = error.message;
@@ -239,14 +257,14 @@ export function useMultiFormatParser() {
     // Post-process transactions to assign tags and categories
     const postProcessTransactions = (transactions) => {
         console.log('🔄 Post-processing transactions for tag assignment...');
-        
-        return transactions.map(transaction => {
+
+        return transactions.map((transaction) => {
             // Clean up tag field (remove # prefix if present)
             let existingTag = transaction.tag;
             if (existingTag && existingTag.startsWith('#')) {
                 existingTag = existingTag.substring(1);
             }
-            
+
             // If no category/subcategory detected, try to detect from description
             if (!transaction.category && !transaction.subcategory && transaction.description) {
                 const detected = detectCategoryFromDescription(transaction.description);
@@ -254,21 +272,17 @@ export function useMultiFormatParser() {
                 transaction.subcategory = detected.subcategory;
                 console.log(`🔍 Detected category for "${transaction.description}":`, detected);
             }
-            
+
             // Determine tag with proper priority handling
-            transaction.tag = determineTag(
-                transaction.category,
-                transaction.subcategory,
-                existingTag
-            );
-            
+            transaction.tag = determineTag(transaction.category, transaction.subcategory, existingTag);
+
             console.log(`🏷️ Final tag assignment for "${transaction.description}":`, {
                 existingTag,
                 category: transaction.category,
                 subcategory: transaction.subcategory,
                 finalTag: transaction.tag
             });
-            
+
             return transaction;
         });
     };
@@ -279,15 +293,19 @@ export function useMultiFormatParser() {
             parseError.value = null;
 
             let transactions;
-            
+
             // Try to detect if it's JSON
             if (fileName.toLowerCase().endsWith('.json') || fileContent.trim().startsWith('{')) {
                 transactions = parseJSONTransactions(fileContent);
+                // Save total JSON transactions count AFTER parsing
+                updatePersistentCount('TOTAL_JSON_TRANSACTIONS', transactions.length);
             } else {
                 // Default to CSV
                 transactions = parseCSVTransactions(fileContent);
+                // Save total CSV transactions count AFTER parsing
+                updatePersistentCount('TOTAL_CSV_TRANSACTIONS', transactions.length);
             }
-            
+
             // Post-process transactions for tag assignment
             return postProcessTransactions(transactions);
         } catch (error) {
@@ -296,8 +314,6 @@ export function useMultiFormatParser() {
             throw error;
         }
     };
-
-
 
     // Get all available categories from tag mapping
     const getAvailableCategories = () => {
@@ -315,42 +331,32 @@ export function useMultiFormatParser() {
     const getAvailableTags = () => {
         const tagMapping = getTagMapping();
         const tags = new Set();
-        
+
         // Add tags from custom mappings
-        Object.values(tagMapping).forEach(subcategories => {
-            Object.values(subcategories).forEach(tag => {
+        Object.values(tagMapping).forEach((subcategories) => {
+            Object.values(subcategories).forEach((tag) => {
                 tags.add(tag);
             });
         });
-        
+
         // Add default tags if not already present
-        const defaultTags = [
-            'Groceries',
-            'Transport',
-            'Dining',
-            'Entertainment',
-            'Utilities',
-            'Health',
-            'Shopping',
-            'Housing',
-            'Other'
-        ];
-        
-        defaultTags.forEach(tag => tags.add(tag));
-        
+        const defaultTags = ['Groceries', 'Transport', 'Dining', 'Entertainment', 'Utilities', 'Health', 'Shopping', 'Housing', 'Other'];
+
+        defaultTags.forEach((tag) => tags.add(tag));
+
         // Add custom tags from localStorage
         try {
             const savedCustomTags = localStorage.getItem('customTags');
             if (savedCustomTags) {
                 const customTags = JSON.parse(savedCustomTags);
-                customTags.forEach(customTag => {
+                customTags.forEach((customTag) => {
                     tags.add(customTag.name);
                 });
             }
         } catch (error) {
             console.error('Error loading custom tags for available tags:', error);
         }
-        
+
         return Array.from(tags).sort();
     };
 
@@ -367,4 +373,4 @@ export function useMultiFormatParser() {
         getAvailableTags,
         parseError
     };
-} 
+}
