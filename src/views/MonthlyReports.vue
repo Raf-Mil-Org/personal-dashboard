@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useTransactionStore } from '@/composables/useTransactionStore';
-import { getAvailablePeriods, calculateMonthlyStats, comparePeriods } from '@/utils/monthlyReports';
+import { getAvailablePeriods, calculateMonthlyStats, comparePeriods, calculateTotalStats } from '@/utils/monthlyReports';
 import { formatAmountWithType } from '@/utils/transactionTypeDetermination';
 import { formatCentsAsEuro } from '@/utils/currencyUtils';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
-import Dropdown from 'primevue/dropdown';
+import SelectButton from 'primevue/selectbutton';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
@@ -16,11 +16,22 @@ import Chart from 'primevue/chart';
 const { transactions, loadSavedTransactions } = useTransactionStore();
 
 const availablePeriods = computed(() => {
-    return getAvailablePeriods();
+    const periods = getAvailablePeriods();
+
+    // Add "Total" option that aggregates all periods
+    const totalOption = {
+        name: 'Total (All Periods)',
+        value: 'total',
+        start: null,
+        end: null,
+        formattedRange: 'All Available Data'
+    };
+
+    return [totalOption, ...periods];
 });
 
 // Reactive data
-const selectedPeriod = ref(availablePeriods.value[1]);
+const selectedPeriod = ref('total'); // Default to "Total" option
 const currentPeriodStats = ref(null);
 const periodComparison = ref(null);
 
@@ -32,7 +43,7 @@ watch(
     availablePeriods,
     (periods) => {
         if (periods.length > 0 && !selectedPeriod.value) {
-            selectedPeriod.value = periods[0];
+            selectedPeriod.value = 'total'; // Default to total
         }
     },
     { immediate: true }
@@ -167,6 +178,18 @@ const savingsInvestmentsData = computed(() => {
     };
 });
 
+// Current period display name
+const currentPeriodName = computed(() => {
+    if (!selectedPeriod.value) return 'No Period Selected';
+
+    if (selectedPeriod.value === 'total') {
+        return 'Total (All Periods)';
+    }
+
+    const periodObj = availablePeriods.value.find((p) => p.value === selectedPeriod.value);
+    return periodObj ? periodObj.name : 'Unknown Period';
+});
+
 // Chart options
 const chartOptions = {
     responsive: true,
@@ -186,15 +209,36 @@ const loadPeriodStats = () => {
         return;
     }
 
-    const { start, end } = selectedPeriod.value;
+    // Handle "Total" option
+    if (selectedPeriod.value === 'total') {
+        // Calculate stats for all available data
+        currentPeriodStats.value = calculateTotalStats(transactions.value);
+        periodComparison.value = null; // No comparison for total
+        return;
+    }
+
+    // Find the selected period object
+    const selectedPeriodObj = availablePeriods.value.find((p) => p.value === selectedPeriod.value);
+    if (!selectedPeriodObj) {
+        currentPeriodStats.value = null;
+        periodComparison.value = null;
+        return;
+    }
+
+    const { start, end } = selectedPeriodObj;
     currentPeriodStats.value = calculateMonthlyStats(transactions.value, start, end);
 
     // Calculate comparison with previous period
-    const currentIndex = availablePeriods.value.findIndex((p) => p.value === selectedPeriod.value.value);
+    const currentIndex = availablePeriods.value.findIndex((p) => p.value === selectedPeriod.value);
     if (currentIndex < availablePeriods.value.length - 1) {
         const previousPeriod = availablePeriods.value[currentIndex + 1];
-        const previousStats = calculateMonthlyStats(transactions.value, previousPeriod.start, previousPeriod.end);
-        periodComparison.value = comparePeriods(currentPeriodStats.value, previousStats);
+        // Skip comparison if previous period is also "total"
+        if (previousPeriod.value !== 'total') {
+            const previousStats = calculateMonthlyStats(transactions.value, previousPeriod.start, previousPeriod.end);
+            periodComparison.value = comparePeriods(currentPeriodStats.value, previousStats);
+        } else {
+            periodComparison.value = null;
+        }
     } else {
         periodComparison.value = null;
     }
@@ -260,6 +304,10 @@ onMounted(() => {
     console.log('📊 MonthlyReports: Loaded saved transactions:', hasData);
 
     if (hasTransactions.value && availablePeriods.value.length > 0) {
+        // Set default to total if not already set
+        if (!selectedPeriod.value) {
+            selectedPeriod.value = 'total';
+        }
         loadPeriodStats();
     }
 });
@@ -275,13 +323,28 @@ onMounted(() => {
 
         <!-- Period Selection -->
         <div class="card mb-6">
-            <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <label class="text-sm font-medium">Select Period:</label>
-                    <Dropdown v-model="selectedPeriod" :options="availablePeriods" optionLabel="name" placeholder="Choose a period" class="w-64" />
-                </div>
-                <div class="flex gap-2">
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold">📅 Period Selection</h3>
                     <Button @click="exportPeriodData" :disabled="!currentPeriodStats" label="Export Report" icon="pi pi-download" severity="success" />
+                </div>
+                <div v-if="currentPeriodStats" class="text-center">
+                    <p class="text-sm text-gray-600">
+                        Currently viewing: <span class="font-semibold text-blue-600">{{ currentPeriodName }}</span>
+                    </p>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm font-medium text-gray-700">Select Period:</label>
+                    <SelectButton
+                        v-model="selectedPeriod"
+                        :options="availablePeriods"
+                        optionLabel="name"
+                        optionValue="value"
+                        class="w-full"
+                        :pt="{
+                            button: { class: 'text-sm' }
+                        }"
+                    />
                 </div>
             </div>
         </div>
@@ -649,5 +712,22 @@ onMounted(() => {
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     padding: 1.5rem;
+}
+
+/* Custom styling for SelectButton */
+:deep(.p-selectbutton) {
+    @apply w-full;
+}
+
+:deep(.p-selectbutton .p-button) {
+    @apply flex-1 text-sm py-2 px-3;
+}
+
+:deep(.p-selectbutton .p-button.p-highlight) {
+    @apply bg-blue-500 border-blue-500 text-white;
+}
+
+:deep(.p-selectbutton .p-button:not(.p-highlight)) {
+    @apply bg-white border-gray-300 text-gray-700 hover:bg-gray-50;
 }
 </style>

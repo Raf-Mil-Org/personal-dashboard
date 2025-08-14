@@ -291,3 +291,84 @@ export function comparePeriods(currentStats, previousStats) {
         }
     };
 }
+
+/**
+ * Calculate total statistics for all available data
+ */
+export function calculateTotalStats(transactions) {
+    if (!transactions || transactions.length === 0) {
+        return null;
+    }
+
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    let totalSavings = 0;
+    let totalInvestments = 0;
+    let totalTransfers = 0;
+    let incomeCount = 0;
+    let expenseCount = 0;
+    let savingsCount = 0;
+    let investmentCount = 0;
+    let transferCount = 0;
+
+    transactions.forEach((transaction) => {
+        const amount = parseInt(transaction.amount) || 0; // Amount is now stored in cents
+        const transactionTag = transaction.tag || '';
+        const transactionDescription = transaction.description || '';
+
+        // Use enhanced transaction type determination
+        const transactionType = determineTransactionType(transaction);
+
+        if (transactionType.isIncome) {
+            // Check for specific exclusions in income
+            if (!transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq') && !transactionDescription.toLowerCase().trim().includes('flatex')) {
+                totalIncome += Math.abs(amount);
+                incomeCount++;
+            }
+        } else {
+            // Check if it's savings, investments, or transfers (not expenses)
+            if (transactionTag.toLowerCase() === 'savings' || transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq')) {
+                totalSavings += Math.abs(amount);
+                savingsCount++;
+            } else if (transactionTag.toLowerCase() === 'investments' || transactionDescription.toLowerCase().trim().includes('flatex')) {
+                totalInvestments += Math.abs(amount);
+                investmentCount++;
+            } else if (transactionTag.toLowerCase() === 'transfers') {
+                totalTransfers += Math.abs(amount);
+                transferCount++;
+            } else {
+                // Only count as expense if it's not savings, investments, or transfers
+                totalExpenses += Math.abs(amount);
+                expenseCount++;
+            }
+        }
+    });
+
+    const netAmount = totalIncome - totalExpenses - totalSavings - totalInvestments - totalTransfers;
+    const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+
+    return {
+        period: {
+            start: null,
+            end: null,
+            name: 'Total (All Periods)',
+            formattedRange: 'All Available Data'
+        },
+        summary: {
+            totalIncome,
+            totalExpenses,
+            totalSavings,
+            totalInvestments,
+            totalTransfers,
+            netAmount,
+            savingsRate,
+            incomeCount,
+            expenseCount,
+            savingsCount,
+            investmentCount,
+            transferCount,
+            totalTransactions: transactions.length
+        },
+        transactions: transactions
+    };
+}

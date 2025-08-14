@@ -26,6 +26,7 @@
 ## **PHASE 4: Advanced Features** ✅ (IN PROGRESS)
 
 -   [x] Savings rate tracking over time
+-   [x] Enhanced monthly dashboard with SelectButton
 -   [ ] Investment performance tracking
 -   [ ] Goal-based savings tracking
 -   [ ] Export functionality for savings/investments
