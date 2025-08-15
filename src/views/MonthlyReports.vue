@@ -6,7 +6,7 @@ import { formatAmountWithType } from '@/utils/transactionTypeDetermination';
 import { formatCentsAsEuro } from '@/utils/currencyUtils';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
-import SelectButton from 'primevue/selectbutton';
+import Chip from 'primevue/chip';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
@@ -258,6 +258,19 @@ const formatDate = (date) => {
     });
 };
 
+const handlePeriodSelection = (periodValue) => {
+    // Add a subtle animation effect
+    const chip = event?.target?.closest('.p-chip');
+    if (chip) {
+        chip.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            chip.style.transform = '';
+        }, 150);
+    }
+
+    selectedPeriod.value = periodValue;
+};
+
 const exportPeriodData = () => {
     if (!currentPeriodStats.value) return;
 
@@ -279,9 +292,15 @@ const exportPeriodData = () => {
 };
 
 // Watchers
-watch(selectedPeriod, () => {
-    loadPeriodStats();
-});
+watch(
+    selectedPeriod,
+    () => {
+        if (hasTransactions.value) {
+            loadPeriodStats();
+        }
+    },
+    { immediate: true }
+);
 
 // Watch for transactions changes to reload stats
 watch(
@@ -317,7 +336,10 @@ onMounted(() => {
     <div class="monthly-reports p-6">
         <!-- Header -->
         <div class="mb-6">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">📊 Monthly Reports</h1>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                <i class="pi pi-chart-bar text-3xl text-blue-500 mr-2"></i>
+                Monthly Reports
+            </h1>
             <p class="text-gray-600">Financial analytics based on 23rd-of-the-month cycles</p>
         </div>
 
@@ -325,7 +347,10 @@ onMounted(() => {
         <div class="card mb-6">
             <div class="flex flex-col gap-4">
                 <div class="flex items-center justify-between">
-                    <h3 class="text-lg font-semibold">📅 Period Selection</h3>
+                    <h3 class="text-lg font-semibold">
+                        <i class="pi pi-calendar text-xl text-blue-500 mr-2"></i>
+                        Period Selection
+                    </h3>
                     <Button @click="exportPeriodData" :disabled="!currentPeriodStats" label="Export Report" icon="pi pi-download" severity="success" />
                 </div>
                 <div v-if="currentPeriodStats" class="text-center">
@@ -333,18 +358,27 @@ onMounted(() => {
                         Currently viewing: <span class="font-semibold text-blue-600">{{ currentPeriodName }}</span>
                     </p>
                 </div>
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-3">
                     <label class="text-sm font-medium text-gray-700">Select Period:</label>
-                    <SelectButton
-                        v-model="selectedPeriod"
-                        :options="availablePeriods"
-                        optionLabel="name"
-                        optionValue="value"
-                        class="w-full"
-                        :pt="{
-                            button: { class: 'text-sm' }
-                        }"
-                    />
+                    <div class="flex flex-wrap gap-3">
+                        <Chip
+                            v-for="period in availablePeriods"
+                            :key="period.value"
+                            :data-period="period.value"
+                            :class="[
+                                'cursor-pointer transition-all duration-300 hover:scale-105 border-2 font-medium',
+                                selectedPeriod === period.value ? 'bg-blue-500 text-white border-blue-500 shadow-lg' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 hover:border-gray-400'
+                            ]"
+                            @click="handlePeriodSelection(period.value)"
+                        >
+                            <template #default>
+                                <div class="flex items-center gap-2">
+                                    <i :class="[selectedPeriod === period.value ? 'pi pi-check' : 'pi pi-calendar', 'text-sm']"></i>
+                                    <span>{{ period.name }}</span>
+                                </div>
+                            </template>
+                        </Chip>
+                    </div>
                 </div>
             </div>
         </div>
@@ -364,7 +398,7 @@ onMounted(() => {
                 <Card class="text-center">
                     <template #content>
                         <div class="flex flex-col items-center">
-                            <i class="pi pi-arrow-up-circle text-3xl text-green-500 mb-2"></i>
+                            <i class="pi pi-arrow-up text-3xl text-green-500 mb-2"></i>
                             <h3 class="text-lg font-semibold text-gray-700">Total Income</h3>
                             <p class="text-2xl font-bold text-green-600">
                                 {{ formatCurrency(currentPeriodStats.summary.totalIncome) }}
@@ -378,7 +412,7 @@ onMounted(() => {
                 <Card class="text-center">
                     <template #content>
                         <div class="flex flex-col items-center">
-                            <i class="pi pi-arrow-down-circle text-3xl text-red-500 mb-2"></i>
+                            <i class="pi pi-arrow-down text-3xl text-red-500 mb-2"></i>
                             <h3 class="text-lg font-semibold text-gray-700">Total Expenses</h3>
                             <p class="text-2xl font-bold text-red-600">
                                 {{ formatCurrency(currentPeriodStats.summary.totalExpenses) }}
@@ -451,7 +485,7 @@ onMounted(() => {
                 <Card class="text-center">
                     <template #content>
                         <div class="flex flex-col items-center">
-                            <i class="pi pi-arrow-right-arrow-left text-3xl text-slate-500 mb-2"></i>
+                            <i class="pi pi-exchange text-3xl text-slate-500 mb-2"></i>
                             <h3 class="text-lg font-semibold text-gray-700">Total Transfers</h3>
                             <p class="text-2xl font-bold text-slate-600">
                                 {{ formatCurrency(currentPeriodStats.summary.totalTransfers) }}
@@ -659,45 +693,6 @@ onMounted(() => {
                     </template>
                 </Card>
             </div>
-
-            <!-- Period Transactions Table -->
-            <Card>
-                <template #title>
-                    <h3 class="text-lg font-semibold">📋 Period Transactions</h3>
-                </template>
-                <template #content>
-                    <DataTable :value="currentPeriodStats.transactions" :paginator="true" :rows="10" :rowsPerPageOptions="[5, 10, 20, 50]" stripedRows class="w-full">
-                        <Column field="date" header="Date" sortable>
-                            <template #body="{ data }">
-                                {{ formatDate(data.date) }}
-                            </template>
-                        </Column>
-                        <Column field="description" header="Description" sortable>
-                            <template #body="{ data }">
-                                <span class="truncate max-w-[200px] block">{{ data.description || '-' }}</span>
-                            </template>
-                        </Column>
-                        <Column field="amount" header="Amount" sortable>
-                            <template #body="{ data }">
-                                <span class="font-mono" :class="formatAmountWithType(data.amount, data).colorClass">
-                                    {{ formatAmountWithType(data.amount, data).formatted }}
-                                </span>
-                            </template>
-                        </Column>
-                        <Column field="tag" header="Tag" sortable>
-                            <template #body="{ data }">
-                                <Tag v-if="data.tag" :value="data.tag" severity="info" />
-                                <span v-else class="text-gray-400 text-sm">No tag</span>
-                            </template>
-                        </Column>
-                        <Column field="category" header="Category" sortable>
-                            <template #body="{ data }">
-                                {{ data.category || '-' }}
-                            </template>
-                        </Column>
-                    </DataTable>
-                </template>
-            </Card>
         </div>
     </div>
 </template>
@@ -714,20 +709,37 @@ onMounted(() => {
     padding: 1.5rem;
 }
 
-/* Custom styling for SelectButton */
-:deep(.p-selectbutton) {
-    @apply w-full;
+/* Custom styling for Chips */
+:deep(.p-chip) {
+    @apply border-2 font-medium transition-all duration-300;
 }
 
-:deep(.p-selectbutton .p-button) {
-    @apply flex-1 text-sm py-2 px-3;
+:deep(.p-chip.selected) {
+    @apply bg-blue-500 text-white border-blue-500 shadow-lg transform scale-105;
 }
 
-:deep(.p-selectbutton .p-button.p-highlight) {
-    @apply bg-blue-500 border-blue-500 text-white;
+:deep(.p-chip:not(.selected)) {
+    @apply bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 hover:border-gray-400 hover:shadow-md;
 }
 
-:deep(.p-selectbutton .p-button:not(.p-highlight)) {
-    @apply bg-white border-gray-300 text-gray-700 hover:bg-gray-50;
+/* Special styling for Total chip */
+:deep(.p-chip[data-period='total']) {
+    @apply bg-gradient-to-r from-purple-500 to-blue-500 text-white border-purple-500;
+}
+
+:deep(.p-chip[data-period='total']:not(.selected)) {
+    @apply bg-gradient-to-r from-purple-400 to-blue-400 text-white border-purple-400 hover:from-purple-500 hover:to-blue-500;
+}
+
+/* Ensure PrimeIcons are visible */
+.pi {
+    font-family: 'PrimeIcons' !important;
+    font-style: normal;
+    font-weight: normal;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 </style>

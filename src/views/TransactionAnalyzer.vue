@@ -6,8 +6,11 @@ import { formatCentsAsEuro, centsToEuroString } from '@/utils/currencyUtils';
 import { getTagSeverity, getTagValue, getTagIcon } from '@/utils/tagColors';
 import { formatAmountWithType } from '@/utils/transactionTypeDetermination';
 import SavingsInvestmentDashboard from '@/components/SavingsInvestmentDashboard.vue';
+import { getAvailablePeriods, calculateMonthlyStats, comparePeriods, calculateTotalStats } from '@/utils/monthlyReports';
+import Chart from 'primevue/chart';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
+import Chip from 'primevue/chip';
 import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
 import Dialog from 'primevue/dialog';
@@ -81,6 +84,11 @@ const hasCsvUploaded = ref(false);
 
 // Dashboard state
 const showSavingsDashboard = ref(false);
+
+// Period selection state
+const selectedPeriod = ref('total'); // Default to "Total" option
+const currentPeriodStats = ref(null);
+const periodComparison = ref(null);
 
 // Methods
 const onFileSelect = async (event) => {
@@ -385,6 +393,257 @@ const detectionStats = computed(() => {
     return getDetectionStatistics();
 });
 
+// Basic computed properties
+const hasTransactions = computed(() => transactions.value.length > 0);
+
+// Available periods for selection
+const availablePeriods = computed(() => {
+    const periods = getAvailablePeriods();
+
+    // Add "Total" option that aggregates all periods
+    const totalOption = {
+        name: 'Total (All Periods)',
+        value: 'total',
+        start: null,
+        end: null,
+        formattedRange: 'All Available Data'
+    };
+
+    return [totalOption, ...periods];
+});
+
+// Current period display name
+const currentPeriodName = computed(() => {
+    if (!selectedPeriod.value) return 'No Period Selected';
+
+    if (selectedPeriod.value === 'total') {
+        return 'Total (All Periods)';
+    }
+
+    const periodObj = availablePeriods.value.find((p) => p.value === selectedPeriod.value);
+    return periodObj ? periodObj.name : 'Unknown Period';
+});
+
+// Period-filtered transactions for display
+const periodFilteredTransactions = computed(() => {
+    // Apply period filtering if a specific period is selected (not total)
+    if (selectedPeriod.value && selectedPeriod.value !== 'total') {
+        const selectedPeriodObj = availablePeriods.value.find((p) => p.value === selectedPeriod.value);
+        if (selectedPeriodObj && selectedPeriodObj.start && selectedPeriodObj.end) {
+            return filteredTransactions.value.filter((transaction) => {
+                const transactionDate = new Date(transaction.date);
+                return transactionDate >= selectedPeriodObj.start && transactionDate <= selectedPeriodObj.end;
+            });
+        }
+    }
+
+    // Return all filtered transactions for total view
+    return filteredTransactions.value;
+});
+
+// Chart data for period-specific analysis
+const tagBreakdownData = computed(() => {
+    if (!currentPeriodStats.value) return { labels: [], datasets: [] };
+
+    const tagStats = {};
+    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'];
+
+    // Get transactions for current period
+    const periodTransactions = periodFilteredTransactions.value.filter((t) => {
+        const amount = parseInt(t.amount) || 0;
+        const tag = t.tag || 'Untagged';
+        const description = t.description || '';
+
+        // Only include expense transactions (negative amounts)
+        if (amount >= 0) return false;
+
+        // Exclude savings, investments, and transfers
+        if (tag.toLowerCase() === 'savings' || description.toLowerCase().includes('bunq')) return false;
+        if (tag.toLowerCase() === 'investments' || description.toLowerCase().includes('flatex')) return false;
+        if (tag.toLowerCase() === 'transfers') return false;
+
+        return true;
+    });
+
+    periodTransactions.forEach((transaction) => {
+        const tag = transaction.tag || 'Untagged';
+        const amount = Math.abs(parseInt(transaction.amount) || 0);
+
+        if (!tagStats[tag]) {
+            tagStats[tag] = { amount: 0, count: 0 };
+        }
+        tagStats[tag].amount += amount;
+        tagStats[tag].count++;
+    });
+
+    const sortedData = Object.entries(tagStats)
+        .map(([tagName, data], index) => ({
+            tagName,
+            amount: data.amount,
+            count: data.count,
+            color: colors[index % colors.length]
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+
+    return {
+        labels: sortedData.map((item) => item.tagName),
+        datasets: [
+            {
+                data: sortedData.map((item) => item.amount / 100), // Convert cents to euros
+                backgroundColor: sortedData.map((item) => item.color),
+                borderWidth: 2,
+                borderColor: '#fff'
+            }
+        ]
+    };
+});
+
+// Category breakdown for expense analysis
+const categoryMap = computed(() => {
+    if (!currentPeriodStats.value) return {};
+
+    const categoryStats = {};
+
+    const periodTransactions = periodFilteredTransactions.value.filter((t) => {
+        const amount = parseInt(t.amount) || 0;
+        const tag = t.tag || 'Untagged';
+        const description = t.description || '';
+
+        // Only include expense transactions (negative amounts)
+        if (amount >= 0) return false;
+
+        // Exclude savings, investments, and transfers
+        if (tag.toLowerCase() === 'savings' || description.toLowerCase().includes('bunq')) return false;
+        if (tag.toLowerCase() === 'investments' || description.toLowerCase().includes('flatex')) return false;
+        if (tag.toLowerCase() === 'transfers') return false;
+
+        return true;
+    });
+
+    periodTransactions.forEach((transaction) => {
+        const tag = transaction.tag || 'Untagged';
+        const amount = Math.abs(parseInt(transaction.amount) || 0);
+
+        if (!categoryStats[tag]) {
+            categoryStats[tag] = { amount: 0, count: 0 };
+        }
+        categoryStats[tag].amount += amount;
+        categoryStats[tag].count++;
+    });
+
+    return categoryStats;
+});
+
+// Top expense categories for chart
+const topExpenseCategories = computed(() => {
+    if (!currentPeriodStats.value) return [];
+
+    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'];
+
+    return Object.entries(categoryMap.value)
+        .map(([tag, data], index) => ({
+            tag,
+            amount: data.amount,
+            count: data.count,
+            color: colors[index % colors.length]
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+});
+
+// Top income categories for chart
+const topIncomeCategories = computed(() => {
+    if (!currentPeriodStats.value) return [];
+
+    const incomeStats = {};
+    const colors = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800', '#FF5722', '#795548'];
+
+    const periodTransactions = periodFilteredTransactions.value.filter((t) => {
+        const amount = parseInt(t.amount) || 0;
+        const tag = t.tag || 'Untagged';
+        const description = t.description || '';
+
+        // Only include income transactions (positive amounts)
+        if (amount <= 0) return false;
+
+        // Exclude savings, investments, and transfers from income
+        if (description.toLowerCase().includes('bunq') || description.toLowerCase().includes('flatex')) return false;
+
+        return true;
+    });
+
+    periodTransactions.forEach((transaction) => {
+        const tag = transaction.tag || 'Untagged';
+        const amount = Math.abs(parseInt(transaction.amount) || 0);
+
+        if (!incomeStats[tag]) {
+            incomeStats[tag] = { amount: 0, count: 0 };
+        }
+        incomeStats[tag].amount += amount;
+        incomeStats[tag].count++;
+    });
+
+    return Object.entries(incomeStats)
+        .map(([tagName, data], index) => ({
+            tag: tagName,
+            amount: data.amount,
+            count: data.count,
+            color: colors[index % colors.length]
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+});
+
+// Income vs Expenses vs Savings chart data
+const incomeExpenseData = computed(() => {
+    if (!currentPeriodStats.value) return { labels: [], datasets: [] };
+
+    const { totalIncome, totalExpenses, totalSavings, totalInvestments, totalTransfers } = currentPeriodStats.value.summary;
+
+    return {
+        labels: ['Income', 'Expenses', 'Savings', 'Investments', 'Transfers'],
+        datasets: [
+            {
+                data: [totalIncome / 100, totalExpenses / 100, totalSavings / 100, totalInvestments / 100, totalTransfers / 100], // Convert cents to euros for chart
+                backgroundColor: ['#4CAF50', '#F44336', '#2196F3', '#FF9800', '#9C27B0'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }
+        ]
+    };
+});
+
+// Savings and investments breakdown
+const savingsInvestmentsData = computed(() => {
+    if (!currentPeriodStats.value) return { labels: [], datasets: [] };
+
+    const { totalSavings, totalInvestments, totalTransfers } = currentPeriodStats.value.summary;
+
+    return {
+        labels: ['Savings', 'Investments', 'Transfers'],
+        datasets: [
+            {
+                data: [totalSavings / 100, totalInvestments / 100, totalTransfers / 100], // Convert cents to euros for chart
+                backgroundColor: ['#2196F3', '#FF9800', '#9C27B0'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }
+        ]
+    };
+});
+
+// Chart options
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            position: 'bottom'
+        }
+    }
+};
+
 // Lifecycle
 onMounted(() => {
     console.log('TransactionAnalyzer mounted - starting to load data...');
@@ -414,12 +673,134 @@ onMounted(() => {
     } else {
         console.log('❌ No saved transactions found in localStorage');
     }
+
+    // Initialize period stats if transactions are available
+    if (hasTransactions.value && transactions.value && transactions.value.length > 0) {
+        console.log('📊 Initializing period stats for available transactions...');
+        selectedPeriod.value = 'total';
+        loadPeriodStats();
+    }
 });
 
 // Watch for filter changes
 watch(selectedFilter, () => {
     // Filter logic is handled in the store
 });
+
+// Period selection methods
+const handlePeriodSelection = (periodValue) => {
+    // Add a subtle animation effect
+    const chip = event?.target?.closest('.p-chip');
+    if (chip) {
+        chip.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            chip.style.transform = '';
+        }, 150);
+    }
+
+    selectedPeriod.value = periodValue;
+};
+
+const exportPeriodData = () => {
+    if (!currentPeriodStats.value) return;
+
+    const data = {
+        period: currentPeriodStats.value.period,
+        summary: currentPeriodStats.value.summary,
+        transactions: currentPeriodStats.value.transactions,
+        comparison: periodComparison.value,
+        exportDate: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `monthly-report-${currentPeriodStats.value.period.name.replace(/\s+/g, '-').toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
+const loadPeriodStats = () => {
+    if (!selectedPeriod.value || !hasTransactions.value) {
+        currentPeriodStats.value = null;
+        periodComparison.value = null;
+        return;
+    }
+
+    // Handle "Total" option
+    if (selectedPeriod.value === 'total') {
+        // Calculate stats for all available data
+        currentPeriodStats.value = calculateTotalStats(transactions.value);
+        periodComparison.value = null; // No comparison for total
+        return;
+    }
+
+    // Find the selected period object
+    const selectedPeriodObj = availablePeriods.value.find((p) => p.value === selectedPeriod.value);
+    if (!selectedPeriodObj) {
+        currentPeriodStats.value = null;
+        periodComparison.value = null;
+        return;
+    }
+
+    const { start, end } = selectedPeriodObj;
+    currentPeriodStats.value = calculateMonthlyStats(transactions.value, start, end);
+
+    // Calculate comparison with previous period
+    const currentIndex = availablePeriods.value.findIndex((p) => p.value === selectedPeriod.value);
+    if (currentIndex < availablePeriods.value.length - 1) {
+        const previousPeriod = availablePeriods.value[currentIndex + 1];
+        // Skip comparison if previous period is also "total"
+        if (previousPeriod.value !== 'total') {
+            const previousStats = calculateMonthlyStats(transactions.value, previousPeriod.start, previousPeriod.end);
+            periodComparison.value = comparePeriods(currentPeriodStats.value, previousStats);
+        } else {
+            periodComparison.value = null;
+        }
+    } else {
+        periodComparison.value = null;
+    }
+};
+
+// Watch for period changes
+watch(
+    selectedPeriod,
+    () => {
+        if (hasTransactions.value) {
+            loadPeriodStats();
+        }
+    },
+    { immediate: true }
+);
+
+// Watch for transactions changes to automatically load stats when data becomes available
+watch(
+    transactions,
+    (newTransactions) => {
+        if (newTransactions && newTransactions.length > 0 && hasTransactions.value) {
+            // Ensure "Total" is selected and load stats
+            selectedPeriod.value = 'total';
+            loadPeriodStats();
+        }
+    },
+    { immediate: true }
+);
+
+// Watch for hasTransactions changes to load stats when transactions become available
+watch(
+    hasTransactions,
+    (hasData) => {
+        if (hasData && transactions.value && transactions.value.length > 0) {
+            // Ensure "Total" is selected and load stats
+            selectedPeriod.value = 'total';
+            loadPeriodStats();
+        }
+    },
+    { immediate: true }
+);
 
 // Watch for column visibility changes to save preferences
 watch(
@@ -436,7 +817,10 @@ watch(
         <Toast />
         <!-- Header -->
         <div class="mb-6">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">Transaction Analyzer</h1>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                <i class="pi pi-chart-bar text-3xl text-blue-500 mr-2"></i>
+                Transaction Analyzer
+            </h1>
             <p class="text-gray-600">Upload and analyze your bank transaction CSV files</p>
         </div>
 
@@ -500,9 +884,171 @@ watch(
             </div>
         </div>
 
-        <!-- Summary Statistics -->
-        <div class="card">
-            <h3 class="text-lg font-semibold mb-4">📈 Summary Statistics</h3>
+        <!-- Period Selection -->
+        <div v-if="hasTransactions" class="card mb-6">
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold">
+                        <i class="pi pi-calendar text-xl text-blue-500 mr-2"></i>
+                        Period Selection
+                    </h3>
+                    <Button @click="exportPeriodData" :disabled="!currentPeriodStats" label="Export Report" icon="pi pi-download" severity="success" />
+                </div>
+                <div v-if="currentPeriodStats" class="text-center">
+                    <p class="text-sm text-gray-600">
+                        Currently viewing: <span class="font-semibold text-blue-600">{{ currentPeriodName }}</span>
+                    </p>
+                </div>
+                <div class="flex flex-col gap-3">
+                    <label class="text-sm font-medium text-gray-700">Select Period:</label>
+                    <div class="flex flex-wrap gap-3">
+                        <Chip
+                            v-for="period in availablePeriods"
+                            :key="period.value"
+                            :data-period="period.value"
+                            :class="[
+                                'cursor-pointer transition-all duration-300 hover:scale-105 border-2 font-medium',
+                                selectedPeriod === period.value ? 'bg-blue-500 text-white border-blue-500 shadow-lg' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 hover:border-gray-400'
+                            ]"
+                            @click="handlePeriodSelection(period.value)"
+                        >
+                            <template #default>
+                                <div class="flex items-center gap-2">
+                                    <i :class="[selectedPeriod === period.value ? 'pi pi-check' : 'pi pi-calendar', 'text-sm']"></i>
+                                    <span>{{ period.name }}</span>
+                                </div>
+                            </template>
+                        </Chip>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Content -->
+        <div v-if="currentPeriodStats" class="space-y-6 mb-6">
+            <!-- Period Summary Cards -->
+            <div class="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
+                <!-- Total Income -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-arrow-up text-3xl text-green-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Income</h3>
+                            <p class="text-2xl font-bold text-green-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalIncome) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.incomeCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Total Expenses -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-arrow-down text-3xl text-red-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Expenses</h3>
+                            <p class="text-2xl font-bold text-red-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalExpenses) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.expenseCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Total Savings -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-wallet text-3xl text-emerald-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Savings</h3>
+                            <p class="text-2xl font-bold text-emerald-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalSavings) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.savingsCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Total Investments -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-chart-bar text-3xl text-amber-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Investments</h3>
+                            <p class="text-2xl font-bold text-amber-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalInvestments) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.investmentCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+                <!-- </div> -->
+
+                <!-- Savings & Investments Summary -->
+                <!-- <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"> -->
+                <!-- Total Transfers -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-exchange text-3xl text-slate-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Transfers</h3>
+                            <p class="text-2xl font-bold text-slate-600">
+                                {{ formatCurrency(currentPeriodStats.summary.totalTransfers) }}
+                            </p>
+                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.transferCount }} transactions</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Savings Rate -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-percentage text-3xl text-purple-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Savings Rate</h3>
+                            <p class="text-2xl font-bold text-purple-600">{{ currentPeriodStats.summary.savingsRate.toFixed(1) }}%</p>
+                            <p class="text-sm text-gray-500">Savings / Income</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Net Amount -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-wallet text-3xl text-blue-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Net Amount</h3>
+                            <p class="text-2xl font-bold" :class="currentPeriodStats.summary.netAmount >= 0 ? 'text-green-600' : 'text-red-600'">
+                                {{ formatCurrency(currentPeriodStats.summary.netAmount) }}
+                            </p>
+                            <p class="text-sm text-gray-500">Income - Expenses - Savings</p>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Total Transactions -->
+                <Card class="text-center">
+                    <template #content>
+                        <div class="flex flex-col items-center">
+                            <i class="pi pi-list text-3xl text-purple-500 mb-2"></i>
+                            <h3 class="text-lg font-semibold text-gray-700">Total Transactions</h3>
+                            <p class="text-2xl font-bold text-purple-600">
+                                {{ currentPeriodStats.summary.totalTransactions }}
+                            </p>
+                            <p class="text-sm text-gray-500">All transactions</p>
+                        </div>
+                    </template>
+                </Card>
+            </div>
+        </div>
+
+        <!-- Legacy Summary Statistics (for backward compatibility) -->
+        <div v-if="!currentPeriodStats" class="card">
+            <h3 class="text-lg font-semibold mb-4">
+                <i class="pi pi-chart-bar text-xl text-blue-500 mr-2"></i>
+                Summary Statistics
+            </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="bg-blue-50 p-4 rounded-lg">
                     <div class="text-2xl font-bold text-blue-600">{{ transactions.length }}</div>
@@ -543,8 +1089,229 @@ watch(
             </div>
         </div>
 
-        <!-- Persistent Transaction Counts -->
+        <!-- Period Comparison -->
+        <div v-if="periodComparison" class="card">
+            <h3 class="text-lg font-semibold mb-4">
+                <i class="pi pi-chart-line text-xl text-blue-500 mr-2"></i>
+                Period Comparison
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Income Comparison -->
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-green-800">Income</span>
+                        <i class="pi" :class="periodComparison.income.change >= 0 ? 'pi-arrow-up text-green-600' : 'pi-arrow-down text-red-600'"></i>
+                    </div>
+                    <div class="text-lg font-bold text-green-600">
+                        {{ formatCurrency(periodComparison.income.current) }}
+                    </div>
+                    <div class="text-sm text-green-700">
+                        {{ periodComparison.income.change >= 0 ? '+' : '' }}{{ formatCurrency(periodComparison.income.change) }} ({{ periodComparison.income.changePercent >= 0 ? '+' : '' }}{{ periodComparison.income.changePercent.toFixed(1) }}%)
+                    </div>
+                </div>
+
+                <!-- Expenses Comparison -->
+                <div class="bg-red-50 p-4 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-red-800">Expenses</span>
+                        <i class="pi" :class="periodComparison.expenses.change >= 0 ? 'pi-arrow-up text-red-600' : 'pi-arrow-down text-green-600'"></i>
+                    </div>
+                    <div class="text-lg font-bold text-red-600">
+                        {{ formatCurrency(periodComparison.expenses.current) }}
+                    </div>
+                    <div class="text-sm text-red-700">
+                        {{ periodComparison.expenses.change >= 0 ? '+' : '' }}{{ formatCurrency(periodComparison.expenses.change) }} ({{ periodComparison.expenses.changePercent >= 0 ? '+' : ''
+                        }}{{ periodComparison.expenses.changePercent.toFixed(1) }}%)
+                    </div>
+                </div>
+
+                <!-- Savings Comparison -->
+                <div class="bg-emerald-50 p-4 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-emerald-800">Savings</span>
+                        <i class="pi" :class="periodComparison.savings.change >= 0 ? 'pi-arrow-up text-emerald-600' : 'pi-arrow-down text-red-600'"></i>
+                    </div>
+                    <div class="text-lg font-bold text-emerald-600">
+                        {{ formatCurrency(periodComparison.savings.current) }}
+                    </div>
+                    <div class="text-sm text-emerald-700">
+                        {{ periodComparison.savings.change >= 0 ? '+' : '' }}{{ formatCurrency(periodComparison.savings.change) }} ({{ periodComparison.savings.changePercent >= 0 ? '+' : '' }}{{ periodComparison.savings.changePercent.toFixed(1) }}%)
+                    </div>
+                </div>
+
+                <!-- Investments Comparison -->
+                <div class="bg-amber-50 p-4 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-amber-800">Investments</span>
+                        <i class="pi" :class="periodComparison.investments.change >= 0 ? 'pi-arrow-up text-amber-600' : 'pi-arrow-down text-red-600'"></i>
+                    </div>
+                    <div class="text-lg font-bold text-amber-600">
+                        {{ formatCurrency(periodComparison.investments.current) }}
+                    </div>
+                    <div class="text-sm text-amber-700">
+                        {{ periodComparison.investments.change >= 0 ? '+' : '' }}{{ formatCurrency(periodComparison.investments.change) }} ({{ periodComparison.investments.changePercent >= 0 ? '+' : ''
+                        }}{{ periodComparison.investments.changePercent.toFixed(1) }}%)
+                    </div>
+                </div>
+
+                <!-- Savings Rate Comparison -->
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-purple-800">Savings Rate</span>
+                        <i class="pi" :class="periodComparison.savingsRate.change >= 0 ? 'pi-arrow-up text-purple-600' : 'pi-arrow-down text-red-600'"></i>
+                    </div>
+                    <div class="text-lg font-bold text-purple-600">{{ periodComparison.savingsRate.current.toFixed(1) }}%</div>
+                    <div class="text-sm text-purple-700">
+                        {{ periodComparison.savingsRate.change >= 0 ? '+' : '' }}{{ periodComparison.savingsRate.change.toFixed(1) }}% ({{ periodComparison.savingsRate.changePercent >= 0 ? '+' : ''
+                        }}{{ periodComparison.savingsRate.changePercent.toFixed(1) }}%)
+                    </div>
+                </div>
+
+                <!-- Net Comparison -->
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-blue-800">Net</span>
+                        <i class="pi" :class="periodComparison.net.change >= 0 ? 'pi-arrow-up text-green-600' : 'pi-arrow-down text-red-600'"></i>
+                    </div>
+                    <div class="text-lg font-bold" :class="periodComparison.net.current >= 0 ? 'text-green-600' : 'text-red-600'">
+                        {{ formatCurrency(periodComparison.net.current) }}
+                    </div>
+                    <div class="text-sm" :class="periodComparison.net.change >= 0 ? 'text-green-700' : 'text-red-700'">
+                        {{ periodComparison.net.change >= 0 ? '+' : '' }}{{ formatCurrency(periodComparison.net.change) }} ({{ periodComparison.net.changePercent >= 0 ? '+' : '' }}{{ periodComparison.net.changePercent.toFixed(1) }}%)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div v-if="currentPeriodStats" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Expense Breakdown by Tag -->
+            <div class="card">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="pi pi-chart-pie text-xl text-blue-500 mr-2"></i>
+                    Expense Breakdown by Tag
+                </h3>
+                <div v-if="tagBreakdownData.length > 0" class="h-64">
+                    <Chart type="doughnut" :data="tagBreakdownData" :options="chartOptions" />
+                </div>
+                <div v-else class="text-center py-8 text-gray-500">
+                    <i class="pi pi-chart-pie text-4xl mb-2"></i>
+                    <p>No tagged expenses in this period</p>
+                </div>
+            </div>
+
+            <!-- Income vs Expenses vs Savings -->
+            <div class="card">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="pi pi-chart-bar text-xl text-blue-500 mr-2"></i>
+                    Income vs Expenses vs Savings
+                </h3>
+                <div class="h-64">
+                    <Chart type="pie" :data="incomeExpenseData" :options="chartOptions" />
+                </div>
+            </div>
+
+            <!-- Savings & Investments Breakdown -->
+            <div class="card">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="pi pi-wallet text-xl text-blue-500 mr-2"></i>
+                    Savings & Investments
+                </h3>
+                <div class="h-64">
+                    <Chart type="doughnut" :data="savingsInvestmentsData" :options="chartOptions" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Categories -->
+        <div v-if="currentPeriodStats" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Top Expense Categories -->
+            <div class="card">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="pi pi-fire text-xl text-red-500 mr-2"></i>
+                    Top Expense Categories
+                </h3>
+                <div v-if="topExpenseCategories.length > 0" class="space-y-3">
+                    <div v-for="category in topExpenseCategories" :key="category.tag" class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full" :style="{ backgroundColor: category.color }"></span>
+                            <span class="font-medium">{{ category.tag || 'Untagged' }}</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold">{{ formatCurrency(category.amount) }}</div>
+                            <div class="text-sm text-gray-500">{{ category.count }} transactions</div>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center py-8 text-gray-500">
+                    <p>No expenses in this period</p>
+                </div>
+            </div>
+
+            <!-- Top Income Categories -->
+            <div class="card">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="pi pi-dollar text-xl text-green-500 mr-2"></i>
+                    Top Income Categories
+                </h3>
+                <div v-if="topIncomeCategories.length > 0" class="space-y-3">
+                    <div v-for="category in topIncomeCategories" :key="category.tag" class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full" :style="{ backgroundColor: category.color }"></span>
+                            <span class="font-medium">{{ category.tag || 'Untagged' }}</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold">{{ formatCurrency(category.amount) }}</div>
+                            <div class="text-sm text-gray-500">{{ category.count }} transactions</div>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center py-8 text-gray-500">
+                    <p>No income in this period</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Period Transactions Table -->
+        <!-- <div v-if="currentPeriodStats" class="card">
+            <h3 class="text-lg font-semibold mb-4">
+                <i class="pi pi-list text-xl text-blue-500 mr-2"></i>
+                Period Transactions
+            </h3>
+            <DataTable :value="currentPeriodStats.transactions" :paginator="true" :rows="10" :rowsPerPageOptions="[5, 10, 20, 50]" stripedRows class="w-full">
+                <Column field="date" header="Date" sortable>
+                    <template #body="{ data }">
+                        {{ formatDate(data.date) }}
+                    </template>
+                </Column>
+                <Column field="description" header="Description" sortable>
+                    <template #body="{ data }">
+                        <span class="truncate max-w-[200px] block">{{ data.description || '-' }}</span>
+                    </template>
+                </Column>
+                <Column field="amount" header="Amount" sortable>
+                    <template #body="{ data }">
+                        <span class="font-mono" :class="formatAmountWithType(data.amount, data).colorClass">
+                            {{ formatAmountWithType(data.amount, data).formatted }}
+                        </span>
+                    </template>
+                </Column>
+                <Column field="tag" header="Tag" sortable>
+                    <template #body="{ data }">
+                        <Tag v-if="data.tag" :value="data.tag" severity="info" />
+                        <span v-else class="text-gray-400 text-sm">No tag</span>
+                    </template>
+                </Column>
+                <Column field="category" header="Category" sortable>
+                    <template #body="{ data }">
+                        {{ data.category || '-' }}
+                    </template>
+                </Column>
+            </DataTable>
+        </div> -->
+
         <div class="card">
+            <!-- Persistent Transaction Counts -->
             <h3 class="text-lg font-semibold mb-4">📊 Persistent Transaction Counts</h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-orange-50 p-4 rounded-lg">
@@ -561,11 +1328,8 @@ watch(
                 </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">These counts persist across data clearing and track unique transactions processed</p>
-        </div>
-
-        <!-- Detection Statistics -->
-        <div class="card">
-            <h3 class="text-lg font-semibold mb-4">🔍 Detection Statistics</h3>
+            <!-- Detection Statistics -->
+            <h3 class="text-lg font-semibold mb-4 mt-4">🔍 Detection Statistics</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                 <div class="bg-blue-50 p-3 rounded-lg">
                     <div class="text-lg font-bold text-blue-600">{{ detectionStats.total }}</div>
@@ -617,7 +1381,7 @@ watch(
         <!-- Tag Statistics -->
         <div class="card">
             <h3 class="text-lg font-semibold mb-4">🏷️ Category Breakdown</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div v-for="(stats, tag) in tagStatistics" :key="tag" class="bg-gray-50 p-3 rounded-lg">
                     <div class="font-medium text-gray-900">{{ tag || 'Untagged' }}</div>
                     <div class="text-sm text-gray-600">{{ stats.count }} transactions</div>
@@ -692,7 +1456,7 @@ watch(
                 <!-- <p v-for="value in Object.keys(searchFilteredTransactions[0])" :key="value">{{ `${value}: ${searchFilteredTransactions[0][value]}` }}</p> -->
                 <DataTable
                     :key="`transactions-${tableKey}`"
-                    :value="searchFilteredTransactions"
+                    :value="periodFilteredTransactions"
                     :paginator="true"
                     :rows="20"
                     :rowsPerPageOptions="[10, 20, 50, 100]"
@@ -872,5 +1636,39 @@ watch(
 :deep(.p-selectbutton .p-button) {
     font-size: 0.875rem;
     padding: 0.5rem 1rem;
+}
+
+/* Custom styling for Chips */
+:deep(.p-chip) {
+    @apply border-2 font-medium transition-all duration-300;
+}
+
+:deep(.p-chip.selected) {
+    @apply bg-blue-500 text-white border-blue-500 shadow-lg transform scale-105;
+}
+
+:deep(.p-chip:not(.selected)) {
+    @apply bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 hover:border-gray-400 hover:shadow-md;
+}
+
+/* Special styling for Total chip */
+:deep(.p-chip[data-period='total']) {
+    @apply bg-gradient-to-r from-purple-500 to-blue-500 text-white border-purple-500;
+}
+
+:deep(.p-chip[data-period='total']:not(.selected)) {
+    @apply bg-gradient-to-r from-purple-400 to-blue-400 text-white border-purple-400 hover:from-purple-500 hover:to-blue-500;
+}
+
+/* Ensure PrimeIcons are visible */
+.pi {
+    font-family: 'PrimeIcons' !important;
+    font-style: normal;
+    font-weight: normal;
+    font-variant: normal;
+    text-transform: none;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 </style>
