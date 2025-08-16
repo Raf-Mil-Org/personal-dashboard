@@ -59,6 +59,11 @@ const router = createRouter({
                     component: () => import('@/views/HealthDashboard.vue')
                 },
                 {
+                    path: '/head-3d',
+                    name: 'head-3d',
+                    component: () => import('@/views/Head.vue')
+                },
+                {
                     path: '/task-planner',
                     name: 'task-planner',
                     component: () => import('@/views/TaskPlanner.vue')

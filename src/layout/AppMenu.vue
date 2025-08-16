@@ -14,6 +14,7 @@ const model = ref([
             { label: 'Stocks Table', icon: 'pi pi-fw pi-home', to: '/stocks-table' },
             { label: 'Transaction Analyzer', icon: 'pi pi-fw pi-chart-line', to: '/transaction-analyzer' },
             { label: 'Visuals Dashboard', icon: 'pi pi-fw pi-home', to: '/visuals-dashboard' },
+            { label: 'Head 3D', icon: 'pi pi-fw pi-home', to: '/head-3d' },
             { label: 'Task Planner', icon: 'pi pi-fw pi-home', to: '/task-planner' },
             { label: 'Thought Tracker', icon: 'pi pi-fw pi-home', to: '/thought-tracker' },
             { label: 'Motivation', icon: 'pi pi-fw pi-home', to: '/' },
