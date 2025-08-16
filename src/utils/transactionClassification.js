@@ -217,10 +217,33 @@ export function classifyOutgoingTransaction(transaction) {
         };
     }
 
-    // Check for investments
-    const investmentKeywords = ['flatex', 'investment', 'stock', 'bond', 'etf', 'mutual fund', 'retirement', 'pension', 'portfolio', 'securities', 'trading', 'brokerage', '401k', 'ira', 'roth', 'index fund', 'dividend reinvestment'];
+    // Check for investments (more specific keywords to avoid catching fees/expenses)
+    const investmentKeywords = [
+        'flatex',
+        'investment purchase',
+        'stock purchase',
+        'bond purchase',
+        'etf purchase',
+        'mutual fund purchase',
+        'retirement contribution',
+        'pension contribution',
+        'portfolio purchase',
+        'securities purchase',
+        'trading purchase',
+        'brokerage purchase',
+        '401k contribution',
+        'ira contribution',
+        'roth contribution',
+        'index fund purchase',
+        'dividend reinvestment'
+    ];
     const hasInvestmentKeyword = investmentKeywords.some((keyword) => description.includes(keyword));
-    if (hasInvestmentKeyword || tag === 'investments') {
+
+    // Additional check: exclude transactions that contain fee-related terms
+    const feeKeywords = ['fee', 'commission', 'charge', 'cost', 'expense', 'management fee', 'transaction fee', 'custody fee', 'rebalancing fee'];
+    const hasFeeKeyword = feeKeywords.some((keyword) => description.includes(keyword));
+
+    if ((hasInvestmentKeyword || tag === 'investments') && !hasFeeKeyword) {
         return {
             group: 'investments',
             subgroup: 'general_investment',

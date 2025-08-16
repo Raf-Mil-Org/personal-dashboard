@@ -91,6 +91,9 @@ const currentPeriodStats = ref(null);
 const periodComparison = ref(null);
 const showAllPeriods = ref(false); // Control whether to show all periods or just first 6
 
+// Transaction type filter state
+const activeTransactionFilter = ref(null); // 'income', 'expenses', 'savings', 'investments', or null for all
+
 // Methods
 const onFileSelect = async (event) => {
     const file = event.files[0];
@@ -409,6 +412,15 @@ const toggleShowAllPeriods = () => {
     showAllPeriods.value = !showAllPeriods.value;
 };
 
+// Transaction type filter methods
+const filterByTransactionType = (type) => {
+    activeTransactionFilter.value = type;
+};
+
+const clearTransactionFilter = () => {
+    activeTransactionFilter.value = null;
+};
+
 handlePeriodSelection(availablePeriods.value[1].value);
 
 // watch(
@@ -469,6 +481,116 @@ const periodFilteredTransactions = computed(() => {
                 .map((field) => field.toString().toLowerCase());
 
             return searchableFields.some((field) => field.includes(searchLower));
+        });
+    }
+
+    // Apply transaction type filtering
+    if (activeTransactionFilter.value) {
+        // Define keywords outside switch to avoid lexical declaration errors
+        const incomeKeywords = [
+            'salary',
+            'payslip',
+            'wage',
+            'bonus',
+            'commission',
+            'dividend',
+            'interest received',
+            'compensation',
+            'allowance',
+            'grant',
+            'award',
+            'fee received',
+            'business income',
+            'freelance',
+            'consulting',
+            'rental income',
+            'royalty'
+        ];
+        const savingsKeywords = [
+            'bunq',
+            'savings',
+            'emergency fund',
+            'savings account',
+            'deposit',
+            'save',
+            'reserve',
+            'backup',
+            'nest egg',
+            'rainy day fund',
+            'savings deposit',
+            'money market',
+            'certificate of deposit',
+            'cd',
+            'spaarrekening',
+            'X39367173'
+        ];
+        const investmentKeywords = [
+            'flatex',
+            'investment purchase',
+            'stock purchase',
+            'bond purchase',
+            'etf purchase',
+            'mutual fund purchase',
+            'retirement contribution',
+            'pension contribution',
+            'portfolio purchase',
+            'securities purchase',
+            'trading purchase',
+            'brokerage purchase',
+            '401k contribution',
+            'ira contribution',
+            'roth contribution',
+            'index fund purchase',
+            'dividend reinvestment'
+        ];
+        const feeKeywords = ['fee', 'commission', 'charge', 'cost', 'expense', 'management fee', 'transaction fee', 'custody fee', 'rebalancing fee'];
+
+        filtered = filtered.filter((transaction) => {
+            const amount = parseInt(transaction.amount) || 0;
+            const tag = (transaction.tag || '').toLowerCase();
+            const description = (transaction.description || '').toLowerCase();
+            const category = (transaction.category || '').toLowerCase();
+            const subcategory = (transaction.subcategory || '').toLowerCase();
+            const hasFeeKeyword = feeKeywords.some((keyword) => description.includes(keyword));
+
+            switch (activeTransactionFilter.value) {
+                case 'income':
+                    // Income: positive amounts, specific income keywords
+                    if (amount <= 0) return false;
+                    return incomeKeywords.some((keyword) => description.includes(keyword)) || tag === 'income' || category === 'income' || subcategory === 'income';
+
+                case 'expenses':
+                    // Expenses: negative amounts, excluding savings/investments
+                    if (amount >= 0) return false;
+                    if (tag === 'savings' || tag === 'investments' || description.includes('bunq') || description.includes('flatex')) return false;
+                    return true;
+
+                case 'savings':
+                    // Savings: negative amounts with savings keywords or tags
+                    if (amount >= 0) return false;
+                    return savingsKeywords.some((keyword) => description.includes(keyword)) || tag === 'savings' || category === 'savings' || subcategory === 'savings';
+
+                case 'investments':
+                    // Investments: negative amounts with investment keywords or tags, excluding fees
+                    if (amount >= 0) return false;
+
+                    // Exclude transactions that contain fee-related terms
+                    if (hasFeeKeyword) return false;
+
+                    return (
+                        investmentKeywords.some((keyword) => description.includes(keyword)) ||
+                        tag === 'investments' ||
+                        category === 'investment' ||
+                        category === 'investments' ||
+                        subcategory === 'investment' ||
+                        subcategory === 'etf' ||
+                        subcategory === 'stock' ||
+                        subcategory === 'bond'
+                    );
+
+                default:
+                    return true;
+            }
         });
     }
 
@@ -976,7 +1098,15 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                             <p class="text-2xl font-bold text-green-600">
                                 {{ formatCurrency(currentPeriodStats.summary.totalIncome) }}
                             </p>
-                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.incomeCount }} transactions</p>
+                            <button
+                                @click="filterByTransactionType('income')"
+                                :class="[
+                                    'text-sm px-3 py-1 rounded-full transition-all duration-200 font-medium',
+                                    activeTransactionFilter === 'income' ? 'bg-green-500 text-white shadow-md' : 'text-green-600 bg-green-50 hover:bg-green-100 border border-green-200'
+                                ]"
+                            >
+                                {{ currentPeriodStats.summary.incomeCount }} transactions
+                            </button>
                         </div>
                     </template>
                 </Card>
@@ -990,7 +1120,15 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                             <p class="text-2xl font-bold text-red-600">
                                 {{ formatCurrency(currentPeriodStats.summary.totalExpenses) }}
                             </p>
-                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.expenseCount }} transactions</p>
+                            <button
+                                @click="filterByTransactionType('expenses')"
+                                :class="[
+                                    'text-sm px-3 py-1 rounded-full transition-all duration-200 font-medium',
+                                    activeTransactionFilter === 'expenses' ? 'bg-red-500 text-white shadow-md' : 'text-red-600 bg-red-50 hover:bg-red-100 border border-red-200'
+                                ]"
+                            >
+                                {{ currentPeriodStats.summary.expenseCount }} transactions
+                            </button>
                         </div>
                     </template>
                 </Card>
@@ -1004,7 +1142,15 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                             <p class="text-2xl font-bold text-emerald-600">
                                 {{ formatCurrency(currentPeriodStats.summary.totalSavings) }}
                             </p>
-                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.savingsCount }} transactions</p>
+                            <button
+                                @click="filterByTransactionType('savings')"
+                                :class="[
+                                    'text-sm px-3 py-1 rounded-full transition-all duration-200 font-medium',
+                                    activeTransactionFilter === 'savings' ? 'bg-emerald-500 text-white shadow-md' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                                ]"
+                            >
+                                {{ currentPeriodStats.summary.savingsCount }} transactions
+                            </button>
                         </div>
                     </template>
                 </Card>
@@ -1018,7 +1164,15 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                             <p class="text-2xl font-bold text-amber-600">
                                 {{ formatCurrency(currentPeriodStats.summary.totalInvestments) }}
                             </p>
-                            <p class="text-sm text-gray-500">{{ currentPeriodStats.summary.investmentCount }} transactions</p>
+                            <button
+                                @click="filterByTransactionType('investments')"
+                                :class="[
+                                    'text-sm px-3 py-1 rounded-full transition-all duration-200 font-medium',
+                                    activeTransactionFilter === 'investments' ? 'bg-amber-500 text-white shadow-md' : 'text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                                ]"
+                            >
+                                {{ currentPeriodStats.summary.investmentCount }} transactions
+                            </button>
                         </div>
                     </template>
                 </Card>
@@ -1079,6 +1233,20 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                         </div>
                     </template>
                 </Card>
+            </div>
+
+            <!-- Filter Status and Clear Button -->
+            <div v-if="activeTransactionFilter" class="flex items-center justify-center gap-4 mt-4">
+                <div class="flex items-center gap-2">
+                    <i class="pi pi-filter text-blue-500"></i>
+                    <span class="text-sm text-gray-600">
+                        Showing only <span class="font-semibold text-blue-600 capitalize">{{ activeTransactionFilter }}</span> transactions
+                    </span>
+                </div>
+                <button @click="clearTransactionFilter" class="text-sm px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-all duration-200 font-medium shadow-md hover:shadow-lg">
+                    <i class="pi pi-times mr-1"></i>
+                    Show All Transactions
+                </button>
             </div>
         </div>
 
