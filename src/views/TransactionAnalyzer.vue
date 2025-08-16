@@ -1272,44 +1272,6 @@ watch(
             </div>
         </div>
 
-        <!-- Period Transactions Table -->
-        <!-- <div v-if="currentPeriodStats" class="card">
-            <h3 class="text-lg font-semibold mb-4">
-                <i class="pi pi-list text-xl text-blue-500 mr-2"></i>
-                Period Transactions
-            </h3>
-            <DataTable :value="currentPeriodStats.transactions" :paginator="true" :rows="10" :rowsPerPageOptions="[5, 10, 20, 50]" stripedRows class="w-full">
-                <Column field="date" header="Date" sortable>
-                    <template #body="{ data }">
-                        {{ formatDate(data.date) }}
-                    </template>
-                </Column>
-                <Column field="description" header="Description" sortable>
-                    <template #body="{ data }">
-                        <span class="truncate max-w-[200px] block">{{ data.description || '-' }}</span>
-                    </template>
-                </Column>
-                <Column field="amount" header="Amount" sortable>
-                    <template #body="{ data }">
-                        <span class="font-mono" :class="formatAmountWithType(data.amount, data).colorClass">
-                            {{ formatAmountWithType(data.amount, data).formatted }}
-                        </span>
-                    </template>
-                </Column>
-                <Column field="tag" header="Tag" sortable>
-                    <template #body="{ data }">
-                        <Tag v-if="data.tag" :value="data.tag" severity="info" />
-                        <span v-else class="text-gray-400 text-sm">No tag</span>
-                    </template>
-                </Column>
-                <Column field="category" header="Category" sortable>
-                    <template #body="{ data }">
-                        {{ data.category || '-' }}
-                    </template>
-                </Column>
-            </DataTable>
-        </div> -->
-
         <div class="card">
             <!-- Persistent Transaction Counts -->
             <h3 class="text-lg font-semibold mb-4">📊 Persistent Transaction Counts</h3>
@@ -1328,6 +1290,7 @@ watch(
                 </div>
             </div>
             <p class="text-xs text-gray-500 mt-2">These counts persist across data clearing and track unique transactions processed</p>
+
             <!-- Detection Statistics -->
             <h3 class="text-lg font-semibold mb-4 mt-4">🔍 Detection Statistics</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">

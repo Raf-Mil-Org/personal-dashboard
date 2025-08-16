@@ -13,7 +13,6 @@ const model = ref([
             { label: 'Demo Functionalities', icon: 'pi pi-fw pi-home', to: '/demo-functionalities' },
             { label: 'Stocks Table', icon: 'pi pi-fw pi-home', to: '/stocks-table' },
             { label: 'Transaction Analyzer', icon: 'pi pi-fw pi-chart-line', to: '/transaction-analyzer' },
-            { label: 'Monthly Reports', icon: 'pi pi-fw pi-chart-bar', to: '/monthly-reports' },
             { label: 'Visuals Dashboard', icon: 'pi pi-fw pi-home', to: '/visuals-dashboard' },
             { label: 'Task Planner', icon: 'pi pi-fw pi-home', to: '/task-planner' },
             { label: 'Thought Tracker', icon: 'pi pi-fw pi-home', to: '/thought-tracker' },

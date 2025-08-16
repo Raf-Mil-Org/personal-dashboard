@@ -83,11 +83,7 @@ const router = createRouter({
                     name: 'tag-assignment-test',
                     component: () => import('@/components/TagAssignmentTest.vue')
                 },
-                {
-                    path: '/monthly-reports',
-                    name: 'monthly-reports',
-                    component: () => import('@/views/MonthlyReports.vue')
-                },
+
                 {
                     path: '/uikit/formlayout',
                     name: 'formlayout',
