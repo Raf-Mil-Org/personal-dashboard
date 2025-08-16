@@ -1,8 +1,7 @@
 // Monthly Reports Utilities
 // Based on 23rd-of-the-month cycle (period starts on 23rd and ends on 22nd of next month)
 
-import { determineTransactionType } from '@/utils/transactionTypeDetermination';
-import { formatCentsAsEuro } from '@/utils/currencyUtils';
+import { getTransactionStatistics } from '@/utils/transactionClassification';
 
 /**
  * Get the start date of the current period (23rd of current month)
@@ -125,52 +124,12 @@ export function filterTransactionsForPeriod(transactions, start, end) {
 export function calculateMonthlyStats(transactions, start, end) {
     const periodTransactions = filterTransactionsForPeriod(transactions, start, end);
 
-    let totalIncome = 0;
-    let totalExpenses = 0;
-    let totalSavings = 0;
-    let totalInvestments = 0;
-    let totalTransfers = 0;
-    let incomeCount = 0;
-    let expenseCount = 0;
-    let savingsCount = 0;
-    let investmentCount = 0;
-    let transferCount = 0;
+    // Use the new transaction classification system
+    const stats = getTransactionStatistics(periodTransactions);
 
-    periodTransactions.forEach((transaction) => {
-        const amount = parseInt(transaction.amount) || 0; // Amount is now stored in cents
-        const transactionTag = transaction.tag || '';
-        const transactionDescription = transaction.description || '';
-
-        // Use enhanced transaction type determination
-        const transactionType = determineTransactionType(transaction);
-
-        if (transactionType.isIncome) {
-            // Check for specific exclusions in income
-            if (!transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq') && !transactionDescription.toLowerCase().trim().includes('flatex')) {
-                totalIncome += Math.abs(amount);
-                incomeCount++;
-            }
-        } else {
-            // Check if it's savings, investments, or transfers (not expenses)
-            if (transactionTag.toLowerCase() === 'savings' || transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq')) {
-                totalSavings += Math.abs(amount);
-                savingsCount++;
-            } else if (transactionTag.toLowerCase() === 'investments' || transactionDescription.toLowerCase().trim().includes('flatex')) {
-                totalInvestments += Math.abs(amount);
-                investmentCount++;
-            } else if (transactionTag.toLowerCase() === 'transfers') {
-                totalTransfers += Math.abs(amount);
-                transferCount++;
-            } else {
-                // Only count as expense if it's not savings, investments, or transfers
-                totalExpenses += Math.abs(amount);
-                expenseCount++;
-            }
-        }
-    });
-
-    const netAmount = totalIncome - totalExpenses - totalSavings - totalInvestments - totalTransfers;
-    const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+    // Calculate net amount and savings rate
+    const netAmount = stats.totalIncome - stats.outgoingGroups.expenses - stats.totalSavings - stats.outgoingGroups.investments - stats.outgoingGroups.transfers;
+    const savingsRate = stats.totalIncome > 0 ? (stats.totalSavings / stats.totalIncome) * 100 : 0;
 
     return {
         period: {
@@ -180,18 +139,18 @@ export function calculateMonthlyStats(transactions, start, end) {
             formattedRange: formatDateRange(start, end)
         },
         summary: {
-            totalIncome,
-            totalExpenses,
-            totalSavings,
-            totalInvestments,
-            totalTransfers,
+            totalIncome: stats.totalIncome,
+            totalExpenses: stats.outgoingGroups.expenses,
+            totalSavings: stats.totalSavings, // Use net savings instead of outgoing savings
+            totalInvestments: stats.outgoingGroups.investments,
+            totalTransfers: stats.outgoingGroups.transfers,
             netAmount,
             savingsRate,
-            incomeCount,
-            expenseCount,
-            savingsCount,
-            investmentCount,
-            transferCount,
+            incomeCount: stats.counts.income,
+            expenseCount: stats.counts.expenses,
+            savingsCount: stats.counts.savings,
+            investmentCount: stats.counts.investments,
+            transferCount: stats.counts.outgoingTransfers,
             totalTransactions: periodTransactions.length
         },
         transactions: periodTransactions
@@ -200,12 +159,18 @@ export function calculateMonthlyStats(transactions, start, end) {
 
 /**
  * Get available periods for the last 12 months
+ * @param {boolean} includeCurrentMonth - Whether to include the current month (default: true)
+ * @returns {Array} Array of period objects
  */
-export function getAvailablePeriods() {
+export function getAvailablePeriods(includeCurrentMonth = true) {
     const periods = [];
     const now = new Date();
 
-    for (let i = 0; i < 12; i++) {
+    // Determine the starting offset
+    // If includeCurrentMonth is false, start from the previous month
+    const startOffset = includeCurrentMonth ? 0 : 1;
+
+    for (let i = startOffset; i < 12 + startOffset; i++) {
         const periodDate = new Date(now);
         periodDate.setMonth(periodDate.getMonth() - i);
 
@@ -300,52 +265,12 @@ export function calculateTotalStats(transactions) {
         return null;
     }
 
-    let totalIncome = 0;
-    let totalExpenses = 0;
-    let totalSavings = 0;
-    let totalInvestments = 0;
-    let totalTransfers = 0;
-    let incomeCount = 0;
-    let expenseCount = 0;
-    let savingsCount = 0;
-    let investmentCount = 0;
-    let transferCount = 0;
+    // Use the new transaction classification system
+    const stats = getTransactionStatistics(transactions);
 
-    transactions.forEach((transaction) => {
-        const amount = parseInt(transaction.amount) || 0; // Amount is now stored in cents
-        const transactionTag = transaction.tag || '';
-        const transactionDescription = transaction.description || '';
-
-        // Use enhanced transaction type determination
-        const transactionType = determineTransactionType(transaction);
-
-        if (transactionType.isIncome) {
-            // Check for specific exclusions in income
-            if (!transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq') && !transactionDescription.toLowerCase().trim().includes('flatex')) {
-                totalIncome += Math.abs(amount);
-                incomeCount++;
-            }
-        } else {
-            // Check if it's savings, investments, or transfers (not expenses)
-            if (transactionTag.toLowerCase() === 'savings' || transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq')) {
-                totalSavings += Math.abs(amount);
-                savingsCount++;
-            } else if (transactionTag.toLowerCase() === 'investments' || transactionDescription.toLowerCase().trim().includes('flatex')) {
-                totalInvestments += Math.abs(amount);
-                investmentCount++;
-            } else if (transactionTag.toLowerCase() === 'transfers') {
-                totalTransfers += Math.abs(amount);
-                transferCount++;
-            } else {
-                // Only count as expense if it's not savings, investments, or transfers
-                totalExpenses += Math.abs(amount);
-                expenseCount++;
-            }
-        }
-    });
-
-    const netAmount = totalIncome - totalExpenses - totalSavings - totalInvestments - totalTransfers;
-    const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+    // Calculate net amount and savings rate
+    const netAmount = stats.totalIncome - stats.outgoingGroups.expenses - stats.totalSavings - stats.outgoingGroups.investments - stats.outgoingGroups.transfers;
+    const savingsRate = stats.totalIncome > 0 ? (stats.totalSavings / stats.totalIncome) * 100 : 0;
 
     return {
         period: {
@@ -355,18 +280,18 @@ export function calculateTotalStats(transactions) {
             formattedRange: 'All Available Data'
         },
         summary: {
-            totalIncome,
-            totalExpenses,
-            totalSavings,
-            totalInvestments,
-            totalTransfers,
+            totalIncome: stats.totalIncome,
+            totalExpenses: stats.outgoingGroups.expenses,
+            totalSavings: stats.totalSavings, // Use net savings instead of outgoing savings
+            totalInvestments: stats.outgoingGroups.investments,
+            totalTransfers: stats.outgoingGroups.transfers,
             netAmount,
             savingsRate,
-            incomeCount,
-            expenseCount,
-            savingsCount,
-            investmentCount,
-            transferCount,
+            incomeCount: stats.counts.income,
+            expenseCount: stats.counts.expenses,
+            savingsCount: stats.counts.savings,
+            investmentCount: stats.counts.investments,
+            transferCount: stats.counts.outgoingTransfers,
             totalTransactions: transactions.length
         },
         transactions: transactions

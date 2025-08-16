@@ -89,6 +89,7 @@ const showSavingsDashboard = ref(false);
 const selectedPeriod = ref('total'); // Default to "Total" option
 const currentPeriodStats = ref(null);
 const periodComparison = ref(null);
+const showAllPeriods = ref(false); // Control whether to show all periods or just first 6
 
 // Methods
 const onFileSelect = async (event) => {
@@ -364,7 +365,11 @@ const hasTransactions = computed(() => transactions.value.length > 0);
 
 // Available periods for selection
 const availablePeriods = computed(() => {
-    const periods = getAvailablePeriods();
+    // Control whether to include the current month in period selection
+    // Set to false to exclude the current month (which might have zero stats)
+    // Set to true to include the current month (default behavior)
+    const includeCurrentMonth = false; // Set to false to exclude current month
+    const periods = getAvailablePeriods(includeCurrentMonth);
 
     // Add "Total" option that aggregates all periods
     const totalOption = {
@@ -377,6 +382,41 @@ const availablePeriods = computed(() => {
 
     return [totalOption, ...periods];
 });
+
+// Computed property for visible periods (first 6 + show more functionality)
+const visiblePeriods = computed(() => {
+    if (showAllPeriods.value) {
+        return availablePeriods.value;
+    }
+    return availablePeriods.value.slice(0, 6); // Show only first 6 periods
+});
+
+// Period selection methods
+const handlePeriodSelection = (periodValue) => {
+    // Add a subtle animation effect
+    const chip = event?.target?.closest('.p-chip');
+    if (chip) {
+        chip.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            chip.style.transform = '';
+        }, 150);
+    }
+
+    selectedPeriod.value = periodValue;
+};
+
+const toggleShowAllPeriods = () => {
+    showAllPeriods.value = !showAllPeriods.value;
+};
+
+handlePeriodSelection(availablePeriods.value[1].value);
+
+// watch(
+//     () => availablePeriods.value,
+//     (newArrayValue) => {
+//         selectedPeriod.value = newArrayValue[0];
+//     }
+// );
 
 // Current period display name
 const currentPeriodName = computed(() => {
@@ -680,20 +720,6 @@ watch(selectedFilter, () => {
     // Filter logic is handled in the store
 });
 
-// Period selection methods
-const handlePeriodSelection = (periodValue) => {
-    // Add a subtle animation effect
-    const chip = event?.target?.closest('.p-chip');
-    if (chip) {
-        chip.style.transform = 'scale(0.95)';
-        setTimeout(() => {
-            chip.style.transform = '';
-        }, 150);
-    }
-
-    selectedPeriod.value = periodValue;
-};
-
 const exportPeriodData = () => {
     if (!currentPeriodStats.value) return;
 
@@ -899,10 +925,10 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                     </p>
                 </div>
                 <div class="flex flex-col gap-3">
-                    <label class="text-sm font-medium text-gray-700">Select Period:</label>
-                    <div class="flex flex-wrap gap-3">
+                    <label class="text-sm font-medium text-gray-700">Select Period: {{ selectedPeriod }}</label>
+                    <div class="flex flex-wrap gap-3 period-chips-container">
                         <Chip
-                            v-for="period in availablePeriods"
+                            v-for="period in visiblePeriods"
                             :key="period.value"
                             :data-period="period.value"
                             :class="[
@@ -915,6 +941,20 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                                 <div class="flex items-center gap-2">
                                     <i :class="[selectedPeriod === period.value ? 'pi pi-check' : 'pi pi-calendar', 'text-sm']"></i>
                                     <span>{{ period.name }}</span>
+                                </div>
+                            </template>
+                        </Chip>
+
+                        <!-- Show More/Less Button -->
+                        <Chip
+                            v-if="availablePeriods.length > 6"
+                            :class="['cursor-pointer transition-all duration-300 hover:scale-105 border-2 font-medium bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:border-gray-300 show-more-button']"
+                            @click="toggleShowAllPeriods"
+                        >
+                            <template #default>
+                                <div class="flex items-center gap-2">
+                                    <i :class="[showAllPeriods ? 'pi pi-chevron-up' : 'pi pi-chevron-down', 'text-sm']"></i>
+                                    <span>{{ showAllPeriods ? 'Show Less' : `Show ${availablePeriods.length - 6} More` }}</span>
                                 </div>
                             </template>
                         </Chip>
@@ -1634,5 +1674,20 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
     line-height: 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth transitions for period chips */
+.period-chips-container {
+    transition: all 0.3s ease-in-out;
+}
+
+/* Animation for show more/less button */
+.show-more-button {
+    transition: all 0.2s ease-in-out;
+}
+
+.show-more-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 </style>

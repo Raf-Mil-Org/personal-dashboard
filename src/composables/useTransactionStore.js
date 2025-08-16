@@ -1,6 +1,7 @@
 // composables/useTransactionStore.js
 import { computed, ref, watch } from 'vue';
 import { getAllStandardColumns, DEFAULT_VISIBLE_COLUMNS } from '@/data/columnMapping';
+import { getTransactionStatistics } from '@/utils/transactionClassification';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -512,52 +513,17 @@ export function useTransactionStore() {
     }
 
     function calculateStatistics() {
-        let incomeCents = 0;
-        let expensesCents = 0;
-        let savingsCents = 0;
-        let investmentsCents = 0;
-        let transfersCents = 0;
-
-        filteredTransactions.value.forEach((transaction) => {
-            // Amount is now stored in cents
-            const amountCents = transaction.amount || 0;
-            const transactionTag = transaction.tag || '';
-            const transactionDescription = transaction.description || '';
-
-            // Use 'debit_credit' field to determine if it's income or expense
-            const debitCredit = transaction.debit_credit || '';
-            const isIncome = debitCredit.trim().toLowerCase() === 'credit' && (!transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq') || !transactionDescription.toLowerCase().trim().includes('flatex'));
-
-            if (isIncome) {
-                incomeCents += Math.abs(amountCents); // Use absolute value for consistency
-            } else {
-                // Check if it's savings, investments, or transfers (not expenses)
-                if (transactionTag.toLowerCase() === 'savings' || transactionDescription.toLowerCase().trim().includes('rmiliopoulosbunq')) {
-                    savingsCents += Math.abs(amountCents);
-                } else if (transactionTag.toLowerCase() === 'investments' || transactionDescription.toLowerCase().trim().includes('flatex')) {
-                    investmentsCents += Math.abs(amountCents);
-                } else if (transactionTag.toLowerCase() === 'transfers') {
-                    transfersCents += Math.abs(amountCents);
-                } else {
-                    // Only count as expense if it's not savings, investments, or transfers
-                    expensesCents += Math.abs(amountCents);
-                }
-            }
-        });
-
-        // Calculate savings rate (savings + investments) / income
-        const totalSavingsAndInvestments = savingsCents;
-        const totalInvestments = investmentsCents;
-        const calculatedSavingsRate = incomeCents > 0 ? (totalSavingsAndInvestments / incomeCents) * 100 : 0;
+        // Use the new transaction classification system
+        const stats = getTransactionStatistics(filteredTransactions.value);
 
         // Update reactive values (store in cents)
-        totalIncome.value = incomeCents;
-        totalExpenses.value = expensesCents;
-        totalSavings.value = savingsCents;
-        totalInvestments.value = investmentsCents;
-        totalTransfers.value = transfersCents;
-        netAmount.value = incomeCents - expensesCents - savingsCents - investmentsCents - transfersCents;
-        savingsRate.value = calculatedSavingsRate;
+        totalIncome.value = stats.totalIncome;
+        totalExpenses.value = stats.outgoingGroups.expenses;
+        totalSavings.value = stats.totalSavings; // Use net savings instead of outgoing savings
+        totalInvestments.value = stats.outgoingGroups.investments;
+        totalTransfers.value = stats.outgoingGroups.transfers;
+        netAmount.value = stats.totalIncome - stats.outgoingGroups.expenses - stats.totalSavings - stats.outgoingGroups.investments - stats.outgoingGroups.transfers;
+        savingsRate.value = stats.totalIncome > 0 ? (stats.totalSavings / stats.totalIncome) * 100 : 0;
 
         console.log('📈 Final totals (in cents):', {
             totalIncome: totalIncome.value,
