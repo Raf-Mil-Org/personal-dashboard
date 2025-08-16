@@ -331,45 +331,11 @@ const isDateInRange = (transactionDate) => {
     return true;
 };
 
-// Computed property for search and date filtered transactions
-const searchFilteredTransactions = computed(() => {
-    let filtered = filteredTransactions.value;
-
-    // Apply date filtering first
-    filtered = filtered.filter((transaction) => isDateInRange(transaction.date));
-
-    // Apply search filtering
-    if (searchTerm.value.trim()) {
-        const searchLower = searchTerm.value.toLowerCase().trim();
-
-        filtered = filtered.filter((transaction) => {
-            // Search in multiple fields
-            const searchableFields = [
-                transaction.description,
-                transaction.tag,
-                transaction.category,
-                transaction.subcategory,
-                transaction.date,
-                transaction.account,
-                transaction.counterparty,
-                // Convert cents to euros for search
-                transaction.amount ? centsToEuroString(transaction.amount) : null
-            ]
-                .filter((field) => field != null)
-                .map((field) => field.toString().toLowerCase());
-
-            return searchableFields.some((field) => field.includes(searchLower));
-        });
-    }
-
-    return filtered;
-});
-
-// Computed property for tag statistics based on date-filtered transactions
+// Computed property for tag statistics based on period-filtered transactions
 const tagStatistics = computed(() => {
     const tagStats = {};
 
-    searchFilteredTransactions.value.forEach((transaction) => {
+    periodFilteredTransactions.value.forEach((transaction) => {
         const tag = transaction.tag || 'Untagged';
         if (!tagStats[tag]) {
             tagStats[tag] = { count: 0, total: 0 };
@@ -424,21 +390,49 @@ const currentPeriodName = computed(() => {
     return periodObj ? periodObj.name : 'Unknown Period';
 });
 
-// Period-filtered transactions for display
+// Period-filtered transactions for display (combines all filters)
 const periodFilteredTransactions = computed(() => {
+    let filtered = filteredTransactions.value;
+
     // Apply period filtering if a specific period is selected (not total)
     if (selectedPeriod.value && selectedPeriod.value !== 'total') {
         const selectedPeriodObj = availablePeriods.value.find((p) => p.value === selectedPeriod.value);
         if (selectedPeriodObj && selectedPeriodObj.start && selectedPeriodObj.end) {
-            return filteredTransactions.value.filter((transaction) => {
+            filtered = filtered.filter((transaction) => {
                 const transactionDate = new Date(transaction.date);
                 return transactionDate >= selectedPeriodObj.start && transactionDate <= selectedPeriodObj.end;
             });
         }
     }
 
-    // Return all filtered transactions for total view
-    return filteredTransactions.value;
+    // Apply date filtering from date selectors
+    filtered = filtered.filter((transaction) => isDateInRange(transaction.date));
+
+    // Apply search filtering
+    if (searchTerm.value.trim()) {
+        const searchLower = searchTerm.value.toLowerCase().trim();
+
+        filtered = filtered.filter((transaction) => {
+            // Search in multiple fields
+            const searchableFields = [
+                transaction.description,
+                transaction.tag,
+                transaction.category,
+                transaction.subcategory,
+                transaction.date,
+                transaction.account,
+                transaction.counterparty,
+                // Convert cents to euros for search
+                transaction.amount ? centsToEuroString(transaction.amount) : null
+            ]
+                .filter((field) => field != null)
+                .map((field) => field.toString().toLowerCase());
+
+            return searchableFields.some((field) => field.includes(searchLower));
+        });
+    }
+
+    return filtered;
 });
 
 // Chart data for period-specific analysis
@@ -561,7 +555,6 @@ const topIncomeCategories = computed(() => {
 
     const periodTransactions = periodFilteredTransactions.value.filter((t) => {
         const amount = parseInt(t.amount) || 0;
-        const tag = t.tag || 'Untagged';
         const description = t.description || '';
 
         // Only include income transactions (positive amounts)
@@ -810,6 +803,12 @@ watch(
     },
     { deep: true }
 );
+
+// Watch for filter changes to update table key and force re-render
+watch([searchTerm, startDate, endDate, selectedPeriod], () => {
+    // Force table re-render when filters change
+    tableKey.value++;
+});
 </script>
 
 <template>
@@ -1404,8 +1403,10 @@ watch(
 
                 <div class="mb-4 flex justify-between items-center">
                     <div class="text-sm text-gray-600">
-                        Showing {{ searchFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)
+                        Showing {{ periodFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)
                         <span v-if="startDate || endDate" class="text-blue-600"> • Date filtered: {{ startDate ? formatDate(startDate) : 'Any' }} to {{ endDate ? formatDate(endDate) : 'Any' }} </span>
+                        <span v-if="searchTerm" class="text-green-600"> • Search: "{{ searchTerm }}"</span>
+                        <span v-if="selectedPeriod && selectedPeriod !== 'total'" class="text-purple-600"> • Period: {{ currentPeriodName }}</span>
                     </div>
                     <div class="flex items-center gap-3">
                         <Button label="Debug Duplicates" icon="pi pi-search" @click="debugCheckDuplicates" size="small" v-tooltip.top="'Check for duplicates in current transactions'" />
@@ -1418,7 +1419,7 @@ watch(
                 <!-- <p>{{ JSON.stringify(Object.keys(searchFilteredTransactions[0])) }}</p> -->
                 <!-- <p v-for="value in Object.keys(searchFilteredTransactions[0])" :key="value">{{ `${value}: ${searchFilteredTransactions[0][value]}` }}</p> -->
                 <DataTable
-                    :key="`transactions-${tableKey}`"
+                    :key="`transactions-${tableKey}-${searchTerm}-${startDate}-${endDate}-${selectedPeriod}`"
                     :value="periodFilteredTransactions"
                     :paginator="true"
                     :rows="20"
