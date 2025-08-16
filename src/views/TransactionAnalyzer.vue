@@ -877,9 +877,9 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
             </div>
             <FileUpload :multiple="false" accept=".csv,.json" previewWidth :maxFileSize="10000000" @select="onFileSelect" chooseLabel="Choose File" cancelLabel="Cancel" :auto="true" class="w-full">
                 <template #empty>
-                    <div class="flex flex-col items-center justify-center p-6 text-gray-500">
+                    <div class="flex flex-col items-center justify-center text-gray-500">
                         <i class="pi pi-file-excel text-4xl mb-2"></i>
-                        <p>Drag and drop your transaction file here or click to browse</p>
+                        <p>Drag and drop your transaction files here</p>
                         <p class="text-sm mt-1">Supports CSV and JSON formats</p>
                     </div>
                 </template>
