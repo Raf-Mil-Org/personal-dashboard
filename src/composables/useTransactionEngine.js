@@ -17,6 +17,7 @@
 
 import { ref, computed } from 'vue';
 import { useTransactionLearning } from './useTransactionLearning';
+import { useMultiFormatParser } from './useMultiFormatParser';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -30,6 +31,9 @@ const STORAGE_KEYS = {
 export function useTransactionEngine() {
     // Initialize learning system
     const { initializeLearning, learnFromAssignment, applyLearnedRules, getLearningStatistics, clearLearnedData, exportLearnedRules, importLearnedRules, totalRules, totalAssignments } = useTransactionLearning();
+
+    // Initialize tag mapping system
+    const { getTagMapping } = useMultiFormatParser();
 
     // State
     const transactions = ref([]);
@@ -231,10 +235,11 @@ export function useTransactionEngine() {
     // ============================================================================
 
     /**
-     * Comprehensive transaction classification with ALL rules
+     * Comprehensive transaction classification with ALL rules AND existing tag validation
      */
     const classifyTransaction = (transaction) => {
         const description = (transaction.description || '').toLowerCase();
+        const existingTag = (transaction.tag || '').toLowerCase();
 
         // PRIORITY 0: Special rules (highest priority)
         for (const rule of TAG_RULES.special) {
@@ -249,20 +254,55 @@ export function useTransactionEngine() {
             }
         }
 
-        // PRIORITY 1: Apply learned rules
+        // PRIORITY 1: Apply learned rules (but validate against current rules)
         const learnedResult = applyLearnedRules(transaction);
         if (learnedResult && learnedResult.confidence > 0.6) {
+            // Validate learned result against current rules
+            const isValidLearnedTag = validateTagAgainstRules(transaction, learnedResult.tag);
+            if (isValidLearnedTag) {
+                return {
+                    tag: learnedResult.tag,
+                    confidence: learnedResult.confidence,
+                    reason: `Learned rule: ${learnedResult.ruleId}`
+                };
+            } else {
+                console.log(`⚠️ Invalidating learned rule for "${description}": ${learnedResult.tag} doesn't match current rules`);
+            }
+        }
+
+        // PRIORITY 2: Check user-defined tag mappings (highest priority for user preferences)
+        const category = (transaction.category || '').toLowerCase();
+        const subcategory = (transaction.subcategory || '').toLowerCase();
+        const tagMapping = getTagMapping();
+        if (category && subcategory && tagMapping[category] && tagMapping[category][subcategory]) {
+            const mappedTag = tagMapping[category][subcategory];
+            console.log(`🏷️ User-defined mapping applied: ${category}/${subcategory} → ${mappedTag}`);
             return {
-                tag: learnedResult.tag,
-                confidence: learnedResult.confidence,
-                reason: `Learned rule: ${learnedResult.ruleId}`
+                tag: mappedTag,
+                confidence: 0.9,
+                reason: `User-defined mapping: ${category}/${subcategory} → ${mappedTag}`
             };
         }
 
-        // PRIORITY 2: Category assignment
+        // PRIORITY 3: Validate existing tag against current rules and category/subcategory
+        if (existingTag && existingTag !== 'untagged' && existingTag !== 'other') {
+            const isExistingTagValid = validateTagAgainstRules(transaction, existingTag);
+            if (isExistingTagValid) {
+                // Existing tag is valid according to current rules
+                return {
+                    tag: existingTag.charAt(0).toUpperCase() + existingTag.slice(1), // Capitalize
+                    confidence: 0.8,
+                    reason: `Validated existing tag: ${existingTag}`
+                };
+            } else {
+                console.log(`⚠️ Invalidating existing tag for "${description}": ${existingTag} doesn't match current rules or category/subcategory`);
+            }
+        }
+
+        // PRIORITY 4: Category assignment
         const categoryResult = assignCategory(transaction);
 
-        // PRIORITY 3: Tag assignment based on comprehensive rules
+        // PRIORITY 5: Tag assignment based on comprehensive rules
         const tagResult = assignTag(transaction);
 
         // Combine results and ensure proper 'Other' classification for unclear transactions
@@ -277,6 +317,90 @@ export function useTransactionEngine() {
             confidence: Math.min(tagResult.confidence || 0.5, categoryResult.confidence || 0.5),
             reason: tagResult.reason || 'No specific indicators detected - classified as Other'
         };
+    };
+
+    /**
+     * Validate if an existing tag is correct based on current rules and category/subcategory
+     */
+    const validateTagAgainstRules = (transaction, tag) => {
+        const description = (transaction.description || '').toLowerCase();
+        const category = (transaction.category || '').toLowerCase();
+        const subcategory = (transaction.subcategory || '').toLowerCase();
+        const amount = parseInt(transaction.amount) || 0;
+
+        const tagLower = tag.toLowerCase();
+
+        // Validation rules based on tag type
+        switch (tagLower) {
+            case 'savings': {
+                // Validate savings tag
+                const savingsKeywords = ['savings', 'emergency fund', 'bunq', 'deposit', 'save', 'goal savings'];
+                const hasSavingsKeyword = savingsKeywords.some((keyword) => description.includes(keyword));
+                const isSavingsCategory = category === 'savings' || subcategory === 'savings' || subcategory === 'savings account' || subcategory === 'emergency fund';
+                return hasSavingsKeyword || isSavingsCategory;
+            }
+
+            case 'transfers': {
+                // Validate transfers tag
+                const transferKeywords = ['transfer', 'internal transfer', 'account transfer', 'between accounts'];
+                const hasTransferKeyword = transferKeywords.some((keyword) => description.includes(keyword));
+                const isTransferCategory = category === 'transfers' || subcategory === 'transfers' || subcategory === 'internal transfer';
+                return hasTransferKeyword || isTransferCategory;
+            }
+
+            case 'investments': {
+                // CRITICAL: Strict validation for investments
+                // Must pass ALL investment checks AND have appropriate category/subcategory
+                if (!isInvestmentTransaction(transaction)) {
+                    return false;
+                }
+
+                // Additional category/subcategory validation for investments
+                const validInvestmentCategories = ['investment', 'investments', 'financial'];
+                const validInvestmentSubcategories = ['investment', 'investment account', 'stock market', 'crypto', 'etf', 'mutual funds', 'investment purchase', 'stock purchase', 'etf purchase', 'bond purchase'];
+
+                const hasValidCategory = validInvestmentCategories.includes(category);
+                const hasValidSubcategory = validInvestmentSubcategories.includes(subcategory);
+
+                // If category/subcategory is explicitly set, it should match
+                if (category && category !== 'other' && !hasValidCategory) {
+                    console.log(`❌ Investment tag invalid: category "${category}" doesn't match investment criteria`);
+                    return false;
+                }
+
+                if (subcategory && subcategory !== 'other' && !hasValidSubcategory) {
+                    console.log(`❌ Investment tag invalid: subcategory "${subcategory}" doesn't match investment criteria`);
+                    return false;
+                }
+
+                return true;
+            }
+
+            case 'income': {
+                // Validate income tag
+                const incomeKeywords = ['salary', 'wage', 'income', 'payment', 'refund', 'dividend', 'bonus', 'commission', 'revenue'];
+                const hasIncomeKeyword = incomeKeywords.some((keyword) => description.includes(keyword));
+                const isPositiveAmount = amount > 0;
+                return hasIncomeKeyword && isPositiveAmount;
+            }
+
+            case 'gift': {
+                // Validate gift tag
+                const giftKeywords = ['gift', 'present', 'donation', 'charity'];
+                const hasGiftKeyword = giftKeywords.some((keyword) => description.includes(keyword));
+                const isGiftCategory = category === 'gift' || subcategory === 'charity' || subcategory === 'donation';
+                return hasGiftKeyword || isGiftCategory;
+            }
+
+            case 'other':
+                // Other is always valid as a fallback
+                return true;
+
+            default:
+                // Unknown tag - invalidate it
+                console.log(`❌ Unknown tag "${tag}" - invalidating`);
+                return false;
+        }
     };
 
     /**
@@ -703,10 +827,10 @@ export function useTransactionEngine() {
     };
 
     /**
-     * Fix all existing tag assignments based on latest rules
+     * Fix all existing tag assignments based on latest rules with enhanced validation
      */
     const fixAllTagAssignments = () => {
-        console.log('🔧 Starting comprehensive tag fixing...');
+        console.log('🔧 Starting comprehensive tag fixing with enhanced validation...');
 
         let fixedCount = 0;
         let trustedCount = 0;
@@ -715,17 +839,22 @@ export function useTransactionEngine() {
         const fixedTransactions = transactions.value.map((transaction) => {
             const oldTag = transaction.tag || 'Untagged';
 
-            // Skip manually overridden transactions
-            if (transaction.overrideHistory && transaction.overrideHistory.length > 0) {
-                skippedCount++;
-                return transaction;
-            }
-
-            // Apply latest classification
+            // Apply latest classification with enhanced validation
             const classification = classifyTransaction(transaction);
             const newTag = classification.tag;
 
             if (newTag !== oldTag) {
+                // Track the fix
+                if (!transaction.fixHistory) {
+                    transaction.fixHistory = [];
+                }
+                transaction.fixHistory.push({
+                    timestamp: new Date().toISOString(),
+                    oldTag,
+                    newTag,
+                    reason: classification.reason || 'Enhanced validation fix'
+                });
+
                 transaction.tag = newTag;
                 transaction.category = classification.category || transaction.category;
                 transaction.subcategory = classification.subcategory || transaction.subcategory;
@@ -733,7 +862,7 @@ export function useTransactionEngine() {
                 transaction.classificationReason = classification.reason;
                 fixedCount++;
 
-                console.log(`🔧 Fixed: "${transaction.description}" (${oldTag} → ${newTag})`);
+                console.log(`🔧 Fixed: "${transaction.description}" (${oldTag} → ${newTag}) - ${classification.reason}`);
             } else {
                 trustedCount++;
             }
@@ -957,6 +1086,9 @@ export function useTransactionEngine() {
 
         // Rules (for debugging and modification)
         CATEGORY_RULES,
-        TAG_RULES
+        TAG_RULES,
+
+        // Tag mapping system
+        getTagMapping
     };
 }
