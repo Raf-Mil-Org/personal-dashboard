@@ -56,44 +56,6 @@ export function useTransactionStore() {
     // Available tags for dropdown
     const availableTags = ref([...DEFAULT_TAGS]);
 
-    // Persistent transaction count tracking functions
-    function getPersistentCount(key) {
-        try {
-            const saved = localStorage.getItem(PERSISTENT_STORAGE_KEYS[key]);
-            return saved ? parseInt(saved, 10) : 0;
-        } catch (error) {
-            console.error(`Error loading persistent count for ${key}:`, error);
-            return 0;
-        }
-    }
-
-    function updatePersistentCount(key, newCount) {
-        try {
-            const currentCount = getPersistentCount(key);
-            const updatedCount = currentCount + newCount;
-            localStorage.setItem(PERSISTENT_STORAGE_KEYS[key], updatedCount.toString());
-            console.log(`📊 Updated persistent count for ${key}: ${currentCount} + ${newCount} = ${updatedCount}`);
-            return updatedCount;
-        } catch (error) {
-            console.error(`Error updating persistent count for ${key}:`, error);
-            return 0;
-        }
-    }
-
-    function getPersistentCounts() {
-        return {
-            totalJsonTransactions: getPersistentCount('TOTAL_JSON_TRANSACTIONS'),
-            totalCsvTransactions: getPersistentCount('TOTAL_CSV_TRANSACTIONS'),
-            totalDatatableTransactions: getPersistentCount('TOTAL_DATATABLE_TRANSACTIONS')
-        };
-    }
-
-    function logPersistentCounts() {
-        const counts = getPersistentCounts();
-        console.log('📊 Persistent Transaction Counts:', counts);
-        return counts;
-    }
-
     // Function to comprehensively re-evaluate and fix ALL existing tag assignments
     function fixAllExistingTagAssignments() {
         console.log('🔧 Starting comprehensive re-evaluation of ALL existing tag assignments...');
@@ -165,90 +127,6 @@ export function useTransactionStore() {
             fixed: fixedCount,
             trusted: trustedCount,
             reEvaluated: reEvaluatedCount
-        };
-    }
-
-    // Function to fix existing incorrect tag assignments based on comprehensive new rules
-    function fixExistingTagAssignments() {
-        let fixedCount = 0;
-        let investmentsToOther = 0;
-        let investmentsToSavings = 0;
-        let investmentsToExpenses = 0;
-        let otherFixes = 0;
-
-        console.log('🔧 Starting comprehensive fix of existing incorrect tag assignments...');
-
-        // Get the comprehensive classification function from useTransactionEngine
-        const { classifyTransaction } = useTransactionEngine();
-
-        transactions.value.forEach((transaction) => {
-            const oldTag = transaction.tag || 'Untagged';
-
-            // Skip transactions that have been manually overridden
-            if (transaction.overrideHistory && transaction.overrideHistory.length > 0) {
-                return;
-            }
-
-            // Apply the comprehensive classification rules (including user-defined mappings)
-            const classification = classifyTransaction(transaction);
-            const newTag = classification.tag;
-
-            if (newTag && newTag !== oldTag) {
-                transaction.tag = newTag;
-                fixedCount++;
-
-                // Track specific fixes
-                if (oldTag === 'Investments') {
-                    if (newTag === 'Other') {
-                        investmentsToOther++;
-                    } else if (newTag === 'Savings') {
-                        investmentsToSavings++;
-                    } else {
-                        otherFixes++;
-                    }
-                }
-
-                // Add fix metadata
-                if (!transaction.fixHistory) {
-                    transaction.fixHistory = [];
-                }
-                transaction.fixHistory.push({
-                    timestamp: new Date().toISOString(),
-                    oldTag,
-                    newTag,
-                    reason: classification.reason || 'Comprehensive rule application'
-                });
-
-                console.log(`🔧 Fixed: "${transaction.description}"`);
-                console.log(`   From: ${oldTag} → To: ${newTag}`);
-                console.log(`   Reason: ${classification.reason}`);
-                console.log('');
-            }
-        });
-
-        if (fixedCount > 0) {
-            console.log(`✅ Comprehensive tag assignment fixes complete:`);
-            console.log(`   📊 Total fixed: ${fixedCount}`);
-            console.log(`   💰 Investments → Other: ${investmentsToOther}`);
-            console.log(`   💰 Investments → Savings: ${investmentsToSavings}`);
-            console.log(`   💰 Investments → Expenses: ${investmentsToExpenses}`);
-            console.log(`   🔄 Other fixes: ${otherFixes}`);
-
-            // Recalculate statistics
-            calculateStatistics();
-
-            // Save the updated transactions
-            saveTransactionsToStorage(transactions.value);
-        } else {
-            console.log('ℹ️ No incorrect tag assignments found to fix');
-        }
-
-        return {
-            total: fixedCount,
-            investmentsToOther,
-            investmentsToSavings,
-            investmentsToExpenses,
-            otherFixes
         };
     }
 
@@ -666,7 +544,7 @@ export function useTransactionStore() {
         const newCount = newUniqueTransactions.length;
 
         if (newCount > 0) {
-            updatePersistentCount('TOTAL_DATATABLE_TRANSACTIONS', newCount);
+            // updatePersistentCount('TOTAL_DATATABLE_TRANSACTIONS', newCount);
             console.log(`📊 Added ${newCount} new unique transactions to datatable`);
         }
 
@@ -690,7 +568,7 @@ export function useTransactionStore() {
         calculateStatistics();
 
         // Log current persistent counts
-        logPersistentCounts();
+        // logPersistentCounts();
     }
 
     function loadSavedTransactions() {
@@ -1029,14 +907,10 @@ export function useTransactionStore() {
         exportTaggedData,
         clearAllData,
         debugCheckDuplicates,
-        fixExistingTagAssignments,
 
         // API stubs
         saveColumnPreferencesToBackend,
         saveTagsToBackend,
-
-        // Persistent tracking functions
-        getPersistentCounts,
 
         // Detection statistics
         getDetectionStatistics,

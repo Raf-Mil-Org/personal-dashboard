@@ -57,7 +57,6 @@ const {
     getLastUploadInfo,
     clearAllData,
     debugCheckDuplicates,
-    getPersistentCounts,
     getDetectionStatistics,
     manuallyOverrideTransaction,
     fixAllExistingTagAssignments,
@@ -752,11 +751,6 @@ const tagStatistics = computed(() => {
     });
 
     return tagStats;
-});
-
-// Persistent counts display
-const persistentCounts = computed(() => {
-    return getPersistentCounts();
 });
 
 // Detection statistics display
@@ -2006,24 +2000,6 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
         </div>
 
         <div class="card">
-            <!-- Persistent Transaction Counts -->
-            <h3 class="text-lg font-semibold mb-4">📊 Persistent Transaction Counts</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-orange-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-orange-600">{{ persistentCounts.totalJsonTransactions }}</div>
-                    <div class="text-sm text-orange-800">Total JSON Transactions</div>
-                </div>
-                <div class="bg-teal-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-teal-600">{{ persistentCounts.totalCsvTransactions }}</div>
-                    <div class="text-sm text-teal-800">Total CSV Transactions</div>
-                </div>
-                <div class="bg-indigo-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-indigo-600">{{ persistentCounts.totalDatatableTransactions }}</div>
-                    <div class="text-sm text-indigo-800">Total Datatable Transactions</div>
-                </div>
-            </div>
-            <p class="text-xs text-gray-500 mt-2">These counts persist across data clearing and track unique transactions processed</p>
-
             <!-- Detection Statistics -->
             <h3 class="text-lg font-semibold mb-4 mt-4">🔍 Detection Statistics</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
