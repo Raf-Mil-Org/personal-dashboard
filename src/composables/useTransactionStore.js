@@ -471,34 +471,6 @@ export function useTransactionStore() {
         localStorage.removeItem(STORAGE_KEYS.LAST_UPLOAD);
     }
 
-    // Debug function to check for duplicates in current transactions
-    function debugCheckDuplicates() {
-        console.log('🔍 Debug: Checking for duplicates in current transactions...');
-        const ids = new Map();
-        const duplicates = [];
-
-        transactions.value.forEach((transaction, index) => {
-            if (ids.has(transaction.id)) {
-                const original = ids.get(transaction.id);
-                duplicates.push({
-                    original: { index: original.index, transaction: original.transaction },
-                    duplicate: { index, transaction },
-                    id: transaction.id
-                });
-            } else {
-                ids.set(transaction.id, { index, transaction });
-            }
-        });
-
-        if (duplicates.length > 0) {
-            console.log(`🚨 Found ${duplicates.length} duplicate pairs:`, duplicates);
-        } else {
-            console.log('✅ No duplicates found in current transactions');
-        }
-
-        return duplicates;
-    }
-
     function setTransactions(newTransactions) {
         console.log('🔄 Setting transactions:', newTransactions.length);
 
@@ -872,7 +844,6 @@ export function useTransactionStore() {
         getTagStatistics,
         exportTaggedData,
         clearAllData,
-        debugCheckDuplicates,
 
         // API stubs
         saveColumnPreferencesToBackend,

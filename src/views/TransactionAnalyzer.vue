@@ -56,7 +56,6 @@ const {
     saveLastUploadInfo,
     getLastUploadInfo,
     clearAllData,
-    debugCheckDuplicates,
     getDetectionStatistics,
     fixAllExistingTagAssignments,
     extractAndMergeAllRules
@@ -1695,7 +1694,6 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                         <span v-if="selectedPeriod && selectedPeriod !== 'total'" class="text-purple-600"> • Period: {{ currentPeriodName }}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <Button label="Debug Duplicates" icon="pi pi-search" @click="debugCheckDuplicates" size="small" v-tooltip.top="'Check for duplicates in current transactions'" />
                         <Button label="Export Tagged Data" icon="pi pi-download" @click="exportTaggedData" size="small" />
                         <Button label="Clear All Data" icon="pi pi-trash" severity="danger" size="small" @click="confirmClearData" v-tooltip.top="'This will remove all transactions and settings'" />
                     </div>
