@@ -297,9 +297,24 @@ export const detectCategoryFromDescription = (description) => {
         return { category: 'Other', subcategory: 'Income' };
     }
 
-    // Savings & investments
-    if (desc.includes('savings') || desc.includes('spaarrekening') || desc.includes('flatex') || desc.includes('investment') || desc.includes('cash order')) {
+    // Savings & investments - more specific logic
+    if (desc.includes('savings') || desc.includes('spaarrekening')) {
         return { category: 'Other', subcategory: 'Savings' };
+    }
+
+    // Investments - only specific investment purchases, not fees
+    if (desc.includes('flatex') && !desc.includes('fee') && !desc.includes('commission') && !desc.includes('charge')) {
+        return { category: 'Other', subcategory: 'Investment' };
+    }
+
+    // Investment purchases (but not fees)
+    if (desc.includes('investment purchase') || desc.includes('stock purchase') || desc.includes('bond purchase') || desc.includes('etf purchase')) {
+        return { category: 'Other', subcategory: 'Investment' };
+    }
+
+    // Cash orders - need more context to determine
+    if (desc.includes('cash order')) {
+        return { category: 'Other', subcategory: 'Transfer' };
     }
 
     return { category: null, subcategory: null };

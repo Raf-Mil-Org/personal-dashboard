@@ -117,13 +117,29 @@ export function useMultiFormatParser() {
             Other: 'Savings'
         },
         Investments: {
-            Investment: 'Investments',
-            'Investment account': 'Investments',
-            'Stock market': 'Investments',
-            Crypto: 'Investments',
-            ETF: 'Investments',
-            'Mutual funds': 'Investments',
-            Other: 'Investments'
+            // Only specific purchase transactions should be investments
+            'Investment purchase': 'Investments',
+            'Stock purchase': 'Investments',
+            'Bond purchase': 'Investments',
+            'ETF purchase': 'Investments',
+            'Portfolio purchase': 'Investments',
+            'Securities purchase': 'Investments',
+            'Crypto purchase': 'Investments',
+            'Mutual fund purchase': 'Investments',
+            'Index fund purchase': 'Investments',
+            // Generic categories should NOT automatically be investments
+            Investment: 'Other',
+            'Investment account': 'Other',
+            'Stock market': 'Other',
+            Crypto: 'Other',
+            ETF: 'Other',
+            'Mutual funds': 'Other',
+            'Investment fee': 'Other',
+            'Trading fee': 'Other',
+            'Account fee': 'Other',
+            Withdrawal: 'Other',
+            Sale: 'Other',
+            Dividend: 'Other'
         },
         Transfers: {
             'Internal transfer': 'Transfers',
@@ -169,14 +185,78 @@ export function useMultiFormatParser() {
         saveCustomTagMapping(customMapping);
     };
 
-    // Determine tag based on category and subcategory with proper priority
-    const determineTag = (category, subcategory, existingTag = null) => {
-        console.log('🔍 Determining tag for:', { category, subcategory, existingTag });
+    // Validate if an existing tag should be trusted
+    const validateExistingTag = (existingTag, description) => {
+        const tag = existingTag.toLowerCase();
+        const desc = (description || '').toLowerCase();
 
-        // Priority 1: If there's already a tag, prioritize it
+        // CRITICAL FIXES: Don't trust obviously wrong tags
+        if (tag === 'investments') {
+            // Don't trust investment tags for savings-related transactions
+            if (desc.includes('bunq') || desc.includes('savings') || desc.includes('emergency fund') || desc.includes('deposit')) {
+                return false;
+            }
+            // Don't trust investment tags for small amounts or fees
+            if (desc.includes('fee') || desc.includes('commission') || desc.includes('charge')) {
+                return false;
+            }
+            // Don't trust investment tags for withdrawals/sales
+            if (desc.includes('withdrawal') || desc.includes('withdraw') || desc.includes('sell') || desc.includes('sale')) {
+                return false;
+            }
+        }
+
+        if (tag === 'savings') {
+            // Don't trust savings tags for investment purchases
+            if (desc.includes('stock purchase') || desc.includes('etf purchase') || desc.includes('investment purchase')) {
+                return false;
+            }
+        }
+
+        if (tag === 'transfers') {
+            // Don't trust transfer tags for actual purchases
+            if (desc.includes('purchase') || desc.includes('buy') || desc.includes('payment')) {
+                return false;
+            }
+        }
+
+        // Trust tags that have clear indicators
+        if (tag === 'savings' && (desc.includes('savings') || desc.includes('bunq') || desc.includes('emergency fund'))) {
+            return true;
+        }
+
+        if (tag === 'transfers' && (desc.includes('transfer') || desc.includes('between accounts'))) {
+            return true;
+        }
+
+        if (tag === 'investments' && (desc.includes('stock purchase') || desc.includes('etf purchase') || desc.includes('investment purchase'))) {
+            return true;
+        }
+
+        // For other cases, be more conservative - only trust if there are clear indicators
+        return false;
+    };
+
+    // Determine tag based on category and subcategory with proper priority
+    const determineTag = (category, subcategory, existingTag = null, description = '') => {
+        console.log('🔍 Determining tag for:', { category, subcategory, existingTag, description });
+
+        // SPECIAL RULE: Revolut transactions should always be Transfers
+        if (description && description.includes('revolut**7355*')) {
+            console.log('✅ Special rule: Revolut transaction classified as Transfers');
+            return 'Transfers';
+        }
+
+        // Priority 1: Re-evaluate existing tags to catch incorrect assignments
         if (existingTag && existingTag.trim()) {
-            console.log('✅ Using existing tag:', existingTag.trim());
-            return existingTag.trim();
+            const shouldTrustExistingTag = validateExistingTag(existingTag, description);
+            if (shouldTrustExistingTag) {
+                console.log('✅ Using trustworthy existing tag:', existingTag.trim());
+                return existingTag.trim();
+            } else {
+                console.log(`🔍 Re-evaluating untrustworthy existing tag: "${existingTag}" for "${description}"`);
+                // Continue to other priorities instead of blindly trusting existing tag
+            }
         }
 
         // Priority 2: Try to map from category/subcategory combination
@@ -294,7 +374,7 @@ export function useMultiFormatParser() {
             }
 
             // Determine tag with proper priority handling
-            transaction.tag = determineTag(transaction.category, transaction.subcategory, existingTag);
+            transaction.tag = determineTag(transaction.category, transaction.subcategory, existingTag, transaction.description);
 
             console.log(`🏷️ Final tag assignment for "${transaction.description}":`, {
                 existingTag,

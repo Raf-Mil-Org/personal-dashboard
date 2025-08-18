@@ -217,9 +217,8 @@ export function classifyOutgoingTransaction(transaction) {
         };
     }
 
-    // Check for investments (more specific keywords to avoid catching fees/expenses)
+    // Check for investments with comprehensive fail-safe checks
     const investmentKeywords = [
-        'flatex',
         'investment purchase',
         'stock purchase',
         'bond purchase',
@@ -239,11 +238,30 @@ export function classifyOutgoingTransaction(transaction) {
     ];
     const hasInvestmentKeyword = investmentKeywords.some((keyword) => description.includes(keyword));
 
-    // Additional check: exclude transactions that contain fee-related terms
-    const feeKeywords = ['fee', 'commission', 'charge', 'cost', 'expense', 'management fee', 'transaction fee', 'custody fee', 'rebalancing fee'];
+    // Comprehensive fee exclusion
+    const feeKeywords = [
+        'fee', 'commission', 'charge', 'cost', 'expense', 
+        'management fee', 'transaction fee', 'custody fee', 'rebalancing fee',
+        'trading fee', 'brokerage fee', 'service charge', 'maintenance fee',
+        'account fee', 'monthly fee', 'annual fee', 'withdrawal fee',
+        'deposit fee', 'transfer fee', 'processing fee', 'handling fee',
+        'custody', 'administration', 'platform fee', 'exchange fee'
+    ];
     const hasFeeKeyword = feeKeywords.some((keyword) => description.includes(keyword));
 
-    if ((hasInvestmentKeyword || tag === 'investments') && !hasFeeKeyword) {
+    // Exclude withdrawals and sales
+    const withdrawalKeywords = [
+        'withdrawal', 'withdraw', 'transfer out', 'sell', 'sale', 'redemption', 
+        'cash out', 'disposal', 'liquidation', 'exit', 'close position'
+    ];
+    const hasWithdrawalKeyword = withdrawalKeywords.some((keyword) => description.includes(keyword));
+
+    // Exclude tax-related transactions
+    const taxKeywords = ['tax', 'withholding', 'dividend tax', 'capital gains'];
+    const hasTaxKeyword = taxKeywords.some((keyword) => description.includes(keyword));
+
+    // Only classify as investment if it passes all exclusion checks
+    if ((hasInvestmentKeyword || tag === 'investments') && !hasFeeKeyword && !hasWithdrawalKeyword && !hasTaxKeyword) {
         return {
             group: 'investments',
             subgroup: 'general_investment',
@@ -251,8 +269,9 @@ export function classifyOutgoingTransaction(transaction) {
         };
     }
 
-    // Check by category/subcategory for investments
-    if (category === 'investment' || category === 'investments' || subcategory === 'investment' || subcategory === 'etf' || subcategory === 'stock' || subcategory === 'bond') {
+    // Check by category/subcategory for investments (more restrictive)
+    const validInvestmentCategories = ['investment purchase', 'stock purchase', 'etf purchase', 'bond purchase'];
+    if (validInvestmentCategories.includes(subcategory)) {
         return {
             group: 'investments',
             subgroup: 'categorized_investment',
@@ -344,6 +363,7 @@ export function classifyTransaction(transaction) {
  * - totalOutgoing: All outgoing transactions (expenses + savings + investments + transfers)
  * - totalIncome: Only actual income sources (salary, business income, etc.) - NOT transfers or refunds
  * - totalSavings: Net savings (deposits to savings - withdrawals from savings)
+ * - totalInvestments: Net investments (deposits to investments - withdrawals from investments)
  * - incomingGroups: Breakdown of incoming transactions by type
  * - outgoingGroups: Breakdown of outgoing transactions by type
  * - counts: Transaction counts for each category
@@ -355,6 +375,7 @@ export function getTransactionStatistics(transactions) {
             totalOutgoing: 0,
             totalIncome: 0, // Only actual income sources (salary, business, etc.)
             totalSavings: 0, // Net savings (deposits - withdrawals)
+            totalInvestments: 0, // Net investments (deposits - withdrawals)
             incomingGroups: {
                 income: 0,
                 transfer: 0,
@@ -385,6 +406,7 @@ export function getTransactionStatistics(transactions) {
     let totalOutgoing = 0;
     let totalIncome = 0; // Only actual income sources (salary, business, etc.)
     let totalSavings = 0; // Net savings (deposits - withdrawals)
+    let totalInvestments = 0; // Net investments (deposits - withdrawals)
     const incomingGroups = { income: 0, transfer: 0, refund: 0 };
     const outgoingGroups = { expenses: 0, savings: 0, investments: 0, transfers: 0 };
     const counts = {
@@ -419,6 +441,11 @@ export function getTransactionStatistics(transactions) {
             if (classification.subgroup === 'from_savings_account') {
                 totalSavings -= amount; // Subtract withdrawals from net savings
             }
+
+            // Track money coming FROM investment accounts (withdrawals)
+            if (classification.subgroup === 'from_investment_account') {
+                totalInvestments -= amount; // Subtract withdrawals from net investments
+            }
         } else {
             totalOutgoing += amount;
             counts.outgoing++;
@@ -435,6 +462,11 @@ export function getTransactionStatistics(transactions) {
             if (classification.group === 'savings') {
                 totalSavings += amount; // Add deposits to net savings
             }
+
+            // Track money going TO investment accounts (deposits)
+            if (classification.group === 'investments') {
+                totalInvestments += amount; // Add deposits to net investments
+            }
         }
     });
 
@@ -443,6 +475,7 @@ export function getTransactionStatistics(transactions) {
         totalOutgoing,
         totalIncome, // Only actual income sources (salary, business, etc.)
         totalSavings, // Net savings (deposits - withdrawals)
+        totalInvestments, // Net investments (deposits - withdrawals)
         incomingGroups,
         outgoingGroups,
         counts

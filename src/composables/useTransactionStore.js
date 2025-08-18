@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { getAllStandardColumns, DEFAULT_VISIBLE_COLUMNS } from '@/data/columnMapping';
 import { getTransactionStatistics } from '@/utils/transactionClassification';
+import { useTransactionLearning } from './useTransactionLearning';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -23,6 +24,9 @@ const PERSISTENT_STORAGE_KEYS = {
 const DEFAULT_TAGS = ['Groceries', 'Utilities', 'Dining', 'Transport', 'Health', 'Entertainment', 'Subscriptions', 'Housing', 'Savings', 'Investments', 'Transfers', 'Other'];
 
 export function useTransactionStore() {
+    // Initialize learning system
+    const { initializeLearning, learnFromAssignment, applyLearnedRules, getLearningStatistics, clearLearnedData, exportLearnedRules, importLearnedRules, totalRules, totalAssignments } = useTransactionLearning();
+
     // State
     const transactions = ref([]);
     const selectedFilter = ref('all');
@@ -93,7 +97,22 @@ export function useTransactionStore() {
     const DETECTION_CONFIG = {
         // Investment keywords and patterns
         investments: {
-            keywords: ['investment', 'invest', 'stock', 'crypto', 'bitcoin', 'ethereum', 'trading', 'portfolio', 'broker', 'degiro', 'trading212', 'etoro', 'coinbase', 'binance', 'mutual fund', 'etf', 'index fund', 'dividend', 'securities', 'bonds'],
+            keywords: [
+                'investment purchase',
+                'stock purchase',
+                'bond purchase',
+                'etf purchase',
+                'mutual fund purchase',
+                'portfolio purchase',
+                'securities purchase',
+                'trading purchase',
+                'brokerage purchase',
+                '401k contribution',
+                'ira contribution',
+                'roth contribution',
+                'index fund purchase',
+                'dividend reinvestment'
+            ],
             accountPatterns: [/degiro/i, /trading212/i, /etoro/i, /coinbase/i, /binance/i, /kraken/i, /interactive brokers/i, /fidelity/i, /vanguard/i, /schwab/i],
             subcategories: ['investment', 'investment account', 'stock market', 'crypto', 'etf', 'mutual funds']
         },
@@ -111,26 +130,93 @@ export function useTransactionStore() {
         }
     };
 
-    // Function to detect savings and investments based on enhanced rules
+    // Function to detect savings and investments based on enhanced rules with proper priorities
     function detectSavingsAndInvestments(transaction) {
         const tag = (transaction.tag || '').toLowerCase();
+        const description = (transaction.description || '').toLowerCase();
+        const category = (transaction.category || '').toLowerCase();
+        const subcategory = (transaction.subcategory || '').toLowerCase();
 
-        // Check if already tagged correctly
-        if (tag === 'investments' || tag === 'savings' || tag === 'transfers') {
+        // SPECIAL RULE: Revolut transactions should always be transfers
+        if (description.includes('revolut**7355*')) {
+            return 'Transfers';
+        }
+
+        // PRIORITY 0: Apply learned rules (highest priority for user preferences)
+        const learnedResult = applyLearnedRules(transaction);
+        if (learnedResult) {
+            return learnedResult.tag;
+        }
+
+        // CRITICAL FIX: Re-evaluate existing tags to catch incorrect assignments
+        // Only trust existing tags if they're clearly correct based on current rules
+        let shouldTrustExistingTag = false;
+
+        if (tag === 'savings') {
+            // Trust savings tag if it has savings indicators
+            const savingsKeywords = ['savings', 'emergency fund', 'bunq', 'deposit', 'save', 'goal savings'];
+            const hasSavingsKeyword = savingsKeywords.some((keyword) => description.includes(keyword));
+            const isSavingsCategory = category === 'savings' || subcategory === 'savings' || subcategory === 'savings account' || subcategory === 'emergency fund';
+            shouldTrustExistingTag = hasSavingsKeyword || isSavingsCategory;
+        } else if (tag === 'transfers') {
+            // Trust transfers tag if it has transfer indicators OR is a Revolut transaction
+            const transferKeywords = ['transfer', 'internal transfer', 'account transfer', 'between accounts'];
+            const hasTransferKeyword = transferKeywords.some((keyword) => description.includes(keyword));
+            const isRevolutTransaction = description.includes('revolut**7355*');
+            shouldTrustExistingTag = hasTransferKeyword || isRevolutTransaction;
+        } else if (tag === 'investments') {
+            // CRITICAL: Only trust investments tag if it passes ALL investment checks
+            // This prevents incorrect investment tags from being preserved
+            // SPECIAL CHECK: Revolut transactions should NEVER be trusted as investments
+            if (description.includes('revolut**7355*')) {
+                shouldTrustExistingTag = false;
+            } else {
+                shouldTrustExistingTag = detectInvestment(transaction);
+            }
+        }
+
+        // If existing tag is trustworthy, use it
+        if (shouldTrustExistingTag) {
             return tag.charAt(0).toUpperCase() + tag.slice(1); // Capitalize first letter
         }
 
-        // Investment detection (highest priority)
+        // If existing tag is not trustworthy, re-evaluate from scratch
+        if (!shouldTrustExistingTag) {
+            console.log(`🔍 Re-evaluating untrustworthy tag "${tag}" for transaction: "${description}"`);
+        }
+
+        // PRIORITY 1: Savings detection (highest priority to avoid misclassification)
+        // Check for savings-specific keywords and patterns first
+        const savingsKeywords = ['savings', 'emergency fund', 'bunq', 'deposit', 'save', 'goal savings'];
+        const hasSavingsKeyword = savingsKeywords.some((keyword) => description.includes(keyword));
+        const isSavingsCategory = category === 'savings' || subcategory === 'savings' || subcategory === 'savings account' || subcategory === 'emergency fund';
+
+        if (hasSavingsKeyword || isSavingsCategory) {
+            if (detectSavings(transaction)) {
+                console.log(`✅ Re-classified as Savings: "${description}"`);
+                return 'Savings';
+            }
+        }
+
+        // PRIORITY 2: Transfer detection (before investments to avoid misclassification)
+        const transferKeywords = ['transfer', 'internal transfer', 'account transfer', 'between accounts'];
+        const hasTransferKeyword = transferKeywords.some((keyword) => description.includes(keyword));
+
+        if (hasTransferKeyword && detectTransfer(transaction)) {
+            return 'Transfers';
+        }
+
+        // PRIORITY 3: Investment detection (most restrictive)
         if (detectInvestment(transaction)) {
             return 'Investments';
         }
 
-        // Savings detection
+        // PRIORITY 4: General savings detection (for other cases)
         if (detectSavings(transaction)) {
             return 'Savings';
         }
 
-        // Transfer detection
+        // PRIORITY 5: General transfer detection (for other cases)
         if (detectTransfer(transaction)) {
             return 'Transfers';
         }
@@ -138,25 +224,127 @@ export function useTransactionStore() {
         return null; // No automatic detection
     }
 
-    // Helper function to detect investments
+    // Helper function to detect investments with comprehensive fail-safe checks
     function detectInvestment(transaction) {
         const description = (transaction.description || '').toLowerCase();
         const subcategory = (transaction.subcategory || '').toLowerCase();
         const counterparty = (transaction.counterparty || '').toLowerCase();
+        const amount = parseInt(transaction.amount) || 0;
 
-        // Check subcategory first
-        if (DETECTION_CONFIG.investments.subcategories.includes(subcategory)) {
+        // FAIL-SAFE CHECK 0: CRITICAL - Revolut transactions should NEVER be investments
+        if (description.includes('revolut**7355*')) {
+            return false;
+        }
+
+        // FAIL-SAFE CHECK 1: Only classify outgoing transactions as investments (negative amounts)
+        if (amount >= 0) {
+            return false;
+        }
+
+        // FAIL-SAFE CHECK 2: Only classify transactions above a certain threshold as investments (to avoid small fees)
+        const amountInEuros = Math.abs(amount) / 100;
+        if (amountInEuros < 10) {
+            return false;
+        }
+
+        // FAIL-SAFE CHECK 3: Comprehensive fee exclusion
+        const feeKeywords = [
+            'fee',
+            'commission',
+            'charge',
+            'cost',
+            'expense',
+            'management fee',
+            'transaction fee',
+            'custody fee',
+            'rebalancing fee',
+            'trading fee',
+            'brokerage fee',
+            'service charge',
+            'maintenance fee',
+            'account fee',
+            'monthly fee',
+            'annual fee',
+            'withdrawal fee',
+            'deposit fee',
+            'transfer fee',
+            'processing fee',
+            'handling fee',
+            'custody',
+            'administration',
+            'platform fee',
+            'exchange fee'
+        ];
+        const hasFeeKeyword = feeKeywords.some((keyword) => description.includes(keyword));
+        if (hasFeeKeyword) {
+            return false;
+        }
+
+        // FAIL-SAFE CHECK 4: Exclude withdrawals, sales, and transfers from investment accounts
+        const withdrawalKeywords = ['withdrawal', 'withdraw', 'transfer out', 'sell', 'sale', 'redemption', 'cash out', 'disposal', 'liquidation', 'exit', 'close position'];
+        const hasWithdrawalKeyword = withdrawalKeywords.some((keyword) => description.includes(keyword));
+        if (hasWithdrawalKeyword) {
+            return false;
+        }
+
+        // FAIL-SAFE CHECK 5: Exclude tax-related transactions
+        const taxKeywords = ['tax', 'withholding', 'dividend tax', 'capital gains'];
+        const hasTaxKeyword = taxKeywords.some((keyword) => description.includes(keyword));
+        if (hasTaxKeyword) {
+            return false;
+        }
+
+        // FAIL-SAFE CHECK 6: Exclude savings-related transactions
+        const savingsKeywords = ['savings', 'emergency fund', 'bunq', 'deposit'];
+        const hasSavingsKeyword = savingsKeywords.some((keyword) => description.includes(keyword));
+        if (hasSavingsKeyword) {
+            return false;
+        }
+
+        // FAIL-SAFE CHECK 7: CRITICAL - Exclude ALL Bunq transactions (they are savings, not investments)
+        if (description.includes('bunq') || counterparty.includes('bunq')) {
+            return false;
+        }
+
+        // POSITIVE CHECK 1: Check for specific investment purchase keywords
+        const investmentPurchaseKeywords = [
+            'investment purchase',
+            'stock purchase',
+            'bond purchase',
+            'etf purchase',
+            'mutual fund purchase',
+            'portfolio purchase',
+            'securities purchase',
+            'trading purchase',
+            'brokerage purchase',
+            '401k contribution',
+            'ira contribution',
+            'roth contribution',
+            'index fund purchase',
+            'dividend reinvestment',
+            'buy',
+            'purchase'
+        ];
+        const hasInvestmentPurchaseKeyword = investmentPurchaseKeywords.some((keyword) => description.includes(keyword));
+        if (hasInvestmentPurchaseKeyword) {
             return true;
         }
 
-        // Check keywords in description
-        if (DETECTION_CONFIG.investments.keywords.some((keyword) => description.includes(keyword))) {
+        // POSITIVE CHECK 2: Check subcategory (but only for specific purchase-related subcategories)
+        const validInvestmentSubcategories = ['investment purchase', 'stock purchase', 'etf purchase', 'bond purchase'];
+        if (validInvestmentSubcategories.includes(subcategory)) {
             return true;
         }
 
-        // Check account patterns
-        if (DETECTION_CONFIG.investments.accountPatterns.some((pattern) => pattern.test(description) || pattern.test(counterparty))) {
-            return true;
+        // POSITIVE CHECK 3: Check account patterns with strict context validation
+        const hasInvestmentAccount = DETECTION_CONFIG.investments.accountPatterns.some((pattern) => pattern.test(description) || pattern.test(counterparty));
+        if (hasInvestmentAccount) {
+            // Only classify as investment if the transaction contains specific purchase keywords
+            const strictInvestmentKeywords = ['purchase', 'buy', 'investment purchase', 'stock purchase', 'etf purchase'];
+            const hasStrictInvestmentKeyword = strictInvestmentKeywords.some((keyword) => description.includes(keyword));
+            if (hasStrictInvestmentKeyword) {
+                return true;
+            }
         }
 
         return false;
@@ -220,6 +408,12 @@ export function useTransactionStore() {
         console.log('🔍 Starting enhanced savings/investments detection...');
 
         transactions.value.forEach((transaction) => {
+            // Skip transactions that have been manually overridden
+            if (transaction.overrideHistory && transaction.overrideHistory.length > 0) {
+                console.log(`⏭️ Skipping manually overridden transaction: "${transaction.description}"`);
+                return;
+            }
+
             const detectedType = detectSavingsAndInvestments(transaction);
             if (detectedType && (!transaction.tag || transaction.tag === 'Other')) {
                 const oldTag = transaction.tag || 'Untagged';
@@ -251,6 +445,255 @@ export function useTransactionStore() {
             investments: investmentsCount,
             savings: savingsCount,
             transfers: transfersCount
+        };
+    }
+
+    // Function to comprehensively re-evaluate and fix ALL existing tag assignments
+    function fixAllExistingTagAssignments() {
+        console.log('🔧 Starting comprehensive re-evaluation of ALL existing tag assignments...');
+
+        let fixedCount = 0;
+        let reEvaluatedCount = 0;
+        let trustedCount = 0;
+
+        transactions.value.forEach((transaction) => {
+            const oldTag = transaction.tag || 'Untagged';
+
+            // Skip transactions that have been manually overridden
+            if (transaction.overrideHistory && transaction.overrideHistory.length > 0) {
+                console.log(`⏭️ Skipping manually overridden transaction: "${transaction.description}"`);
+                return;
+            }
+
+            // Apply the latest detection rules (including learned rules)
+            const newTag = detectSavingsAndInvestments(transaction);
+
+            if (newTag && newTag !== oldTag) {
+                // Update the tag
+                transaction.tag = newTag;
+                fixedCount++;
+
+                // Add fix metadata
+                if (!transaction.fixHistory) {
+                    transaction.fixHistory = [];
+                }
+                transaction.fixHistory.push({
+                    timestamp: new Date().toISOString(),
+                    oldTag,
+                    newTag,
+                    reason: 'Comprehensive re-evaluation'
+                });
+
+                console.log(`🔧 Fixed: "${transaction.description}"`);
+                console.log(`   From: ${oldTag} → To: ${newTag}`);
+                console.log('');
+            } else if (newTag === oldTag) {
+                trustedCount++;
+            } else {
+                reEvaluatedCount++;
+            }
+        });
+
+        if (fixedCount > 0) {
+            console.log(`✅ Comprehensive tag re-evaluation complete:`);
+            console.log(`   🔧 Total fixes applied: ${fixedCount}`);
+            console.log(`   ✅ Trusted existing tags: ${trustedCount}`);
+            console.log(`   🔍 Re-evaluated but unchanged: ${reEvaluatedCount}`);
+
+            // Recalculate statistics
+            calculateStatistics();
+
+            // Save the updated transactions
+            saveTransactionsToStorage(transactions.value);
+        } else {
+            console.log('ℹ️ No incorrect tag assignments found to fix');
+        }
+
+        return {
+            total: transactions.value.length,
+            fixed: fixedCount,
+            trusted: trustedCount,
+            reEvaluated: reEvaluatedCount
+        };
+    }
+
+    // Function to fix existing incorrect tag assignments based on comprehensive new rules
+    function fixExistingTagAssignments() {
+        let fixedCount = 0;
+        let investmentsToOther = 0;
+        let investmentsToSavings = 0;
+        let investmentsToExpenses = 0;
+        let otherFixes = 0;
+
+        console.log('🔧 Starting comprehensive fix of existing incorrect tag assignments...');
+
+        transactions.value.forEach((transaction) => {
+            const oldTag = transaction.tag || 'Untagged';
+            const description = (transaction.description || '').toLowerCase();
+            const category = (transaction.category || '').toLowerCase();
+            const subcategory = (transaction.subcategory || '').toLowerCase();
+            const amount = parseInt(transaction.amount) || 0;
+
+            // Skip transactions that have been manually overridden
+            if (transaction.overrideHistory && transaction.overrideHistory.length > 0) {
+                return;
+            }
+
+            let newTag = oldTag;
+            let fixReason = '';
+
+            // SPECIAL RULE: Revolut transactions should always be Transfers
+            if (description.includes('revolut**7355*')) {
+                newTag = 'Transfers';
+                fixReason = 'Special rule: Revolut transactions are always transfers';
+                if (oldTag === 'Investments') {
+                    investmentsToOther++;
+                } else if (oldTag === 'Other' || oldTag === 'Untagged') {
+                    otherFixes++;
+                }
+            }
+            // COMPREHENSIVE FIX CHECKS FOR INVESTMENT TAGS
+            else if (oldTag === 'Investments') {
+                // Fix 1: Transactions with category 'other' and subcategory 'savings' should be Savings
+                if (category === 'other' && subcategory === 'savings') {
+                    newTag = 'Savings';
+                    fixReason = 'Category "other" with subcategory "savings" should be Savings, not Investments';
+                    investmentsToSavings++;
+                }
+                // Fix 1.5: CRITICAL FIX for Bunq transactions - any transaction with 'bunq' in description should NOT be investments
+                else if (description.includes('bunq')) {
+                    newTag = 'Savings';
+                    fixReason = 'Bunq transactions should be Savings, not Investments';
+                    investmentsToSavings++;
+                }
+                // Fix 2: Small transactions (< 10 EUR) should be Other
+                else if (Math.abs(amount) / 100 < 10) {
+                    newTag = 'Other';
+                    fixReason = 'Small transaction (< 10 EUR) should not be classified as investment';
+                    investmentsToOther++;
+                }
+                // Fix 3: Positive amounts should be Other
+                else if (amount > 0) {
+                    newTag = 'Other';
+                    fixReason = 'Positive amount should not be classified as investment';
+                    investmentsToOther++;
+                }
+                // Fix 4: Fee-related transactions should be Other
+                else {
+                    const feeKeywords = [
+                        'fee',
+                        'commission',
+                        'charge',
+                        'cost',
+                        'expense',
+                        'management fee',
+                        'transaction fee',
+                        'custody fee',
+                        'rebalancing fee',
+                        'trading fee',
+                        'brokerage fee',
+                        'service charge',
+                        'maintenance fee',
+                        'account fee',
+                        'monthly fee',
+                        'annual fee',
+                        'withdrawal fee',
+                        'deposit fee',
+                        'transfer fee',
+                        'processing fee',
+                        'handling fee',
+                        'custody',
+                        'administration',
+                        'platform fee',
+                        'exchange fee'
+                    ];
+                    const hasFeeKeyword = feeKeywords.some((keyword) => description.includes(keyword));
+                    if (hasFeeKeyword) {
+                        newTag = 'Other';
+                        fixReason = 'Fee-related transaction should not be classified as investment';
+                        investmentsToExpenses++;
+                    }
+                    // Fix 5: Withdrawal/sale transactions should be Other
+                    else {
+                        const withdrawalKeywords = ['withdrawal', 'withdraw', 'transfer out', 'sell', 'sale', 'redemption', 'cash out', 'disposal', 'liquidation', 'exit', 'close position'];
+                        const hasWithdrawalKeyword = withdrawalKeywords.some((keyword) => description.includes(keyword));
+                        if (hasWithdrawalKeyword) {
+                            newTag = 'Other';
+                            fixReason = 'Withdrawal/sale transaction should not be classified as investment';
+                            investmentsToExpenses++;
+                        }
+                        // Fix 6: Tax-related transactions should be Other
+                        else {
+                            const taxKeywords = ['tax', 'withholding', 'dividend tax', 'capital gains'];
+                            const hasTaxKeyword = taxKeywords.some((keyword) => description.includes(keyword));
+                            if (hasTaxKeyword) {
+                                newTag = 'Other';
+                                fixReason = 'Tax-related transaction should not be classified as investment';
+                                investmentsToExpenses++;
+                            }
+                            // Fix 7: Savings-related transactions should be Savings
+                            else if (description.includes('savings') || description.includes('bunq') || description.includes('emergency fund') || description.includes('deposit')) {
+                                newTag = 'Savings';
+                                fixReason = 'Savings-related transaction should be classified as Savings, not Investments';
+                                investmentsToSavings++;
+                            }
+                            // Fix 8: Transfer-related transactions should be Transfers
+                            else if (description.includes('transfer') || description.includes('between accounts')) {
+                                newTag = 'Transfers';
+                                fixReason = 'Transfer-related transaction should be classified as Transfers, not Investments';
+                                otherFixes++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Apply the fix if needed
+            if (newTag !== oldTag) {
+                transaction.tag = newTag;
+                fixedCount++;
+
+                // Add fix metadata
+                if (!transaction.fixHistory) {
+                    transaction.fixHistory = [];
+                }
+                transaction.fixHistory.push({
+                    timestamp: new Date().toISOString(),
+                    oldTag,
+                    newTag,
+                    reason: fixReason
+                });
+
+                console.log(`🔧 Fixed: "${transaction.description}"`);
+                console.log(`   From: ${oldTag} → To: ${newTag}`);
+                console.log(`   Reason: ${fixReason}`);
+                console.log('');
+            }
+        });
+
+        if (fixedCount > 0) {
+            console.log(`✅ Comprehensive tag assignment fixes complete:`);
+            console.log(`   📊 Total fixed: ${fixedCount}`);
+            console.log(`   💰 Investments → Other: ${investmentsToOther}`);
+            console.log(`   💰 Investments → Savings: ${investmentsToSavings}`);
+            console.log(`   💰 Investments → Expenses: ${investmentsToExpenses}`);
+            console.log(`   🔄 Other fixes: ${otherFixes}`);
+
+            // Recalculate statistics
+            calculateStatistics();
+
+            // Save the updated transactions
+            saveTransactionsToStorage(transactions.value);
+        } else {
+            console.log('ℹ️ No incorrect tag assignments found to fix');
+        }
+
+        return {
+            total: fixedCount,
+            investmentsToOther,
+            investmentsToSavings,
+            investmentsToExpenses,
+            otherFixes
         };
     }
 
@@ -301,21 +744,27 @@ export function useTransactionStore() {
     function manuallyOverrideTransaction(transactionId, newTag, reason = 'Manual override') {
         const transactionIndex = transactions.value.findIndex((t) => t.id === transactionId);
         if (transactionIndex !== -1) {
-            const oldTag = transactions.value[transactionIndex].tag;
-            transactions.value[transactionIndex].tag = newTag;
+            const transaction = transactions.value[transactionIndex];
+            const oldTag = transaction.tag;
+            transaction.tag = newTag;
 
             // Add override metadata
-            if (!transactions.value[transactionIndex].overrideHistory) {
-                transactions.value[transactionIndex].overrideHistory = [];
+            if (!transaction.overrideHistory) {
+                transaction.overrideHistory = [];
             }
-            transactions.value[transactionIndex].overrideHistory.push({
+            transaction.overrideHistory.push({
                 timestamp: new Date().toISOString(),
                 oldTag,
                 newTag,
                 reason
             });
 
-            console.log(`🔄 Manual override: Transaction "${transactions.value[transactionIndex].description}" changed from "${oldTag}" to "${newTag}" (${reason})`);
+            console.log(`🔄 Manual override: Transaction "${transaction.description}" changed from "${oldTag}" to "${newTag}" (${reason})`);
+
+            // Learn from this manual assignment
+            if (newTag && newTag !== oldTag) {
+                learnFromAssignment(transaction, newTag);
+            }
 
             // Recalculate statistics
             calculateStatistics();
@@ -334,6 +783,12 @@ export function useTransactionStore() {
         } catch (error) {
             console.error('Error resetting persistent counts:', error);
         }
+    }
+
+    // Initialize learning system on startup
+    function initializeTransactionStore() {
+        initializeLearning();
+        console.log('🧠 Transaction learning system initialized');
     }
 
     // Load custom tags and update available tags
@@ -465,6 +920,16 @@ export function useTransactionStore() {
     function updateTransactionTag(transactionId, tag) {
         console.log(`🔄 Updating tag for transaction ${transactionId} to: ${tag}`);
 
+        // Find the transaction
+        const transactionIndex = transactions.value.findIndex((t) => t.id === transactionId);
+        if (transactionIndex === -1) {
+            console.warn(`⚠️ Transaction with ID ${transactionId} not found`);
+            return;
+        }
+
+        const transaction = transactions.value[transactionIndex];
+        const oldTag = transaction.tag;
+
         // Update tags object using transaction ID as key (now deterministic)
         if (tag) {
             tags.value[transactionId] = tag;
@@ -473,25 +938,24 @@ export function useTransactionStore() {
         }
         saveTags();
 
-        // Update the transaction in the list with proper reactivity
-        const transactionIndex = transactions.value.findIndex((t) => t.id === transactionId);
-        if (transactionIndex !== -1) {
-            // Create a new transaction object to ensure reactivity
-            const updatedTransaction = { ...transactions.value[transactionIndex], tag };
-            transactions.value[transactionIndex] = updatedTransaction;
+        // Create a new transaction object to ensure reactivity
+        const updatedTransaction = { ...transaction, tag };
+        transactions.value[transactionIndex] = updatedTransaction;
 
-            console.log(`✅ Updated transaction at index ${transactionIndex}:`, {
-                id: transactionId,
-                oldTag: transactions.value[transactionIndex].tag,
-                newTag: tag,
-                description: updatedTransaction.description
-            });
+        console.log(`✅ Updated transaction at index ${transactionIndex}:`, {
+            id: transactionId,
+            oldTag: oldTag,
+            newTag: tag,
+            description: updatedTransaction.description
+        });
 
-            // Recalculate statistics after tag update
-            calculateStatistics();
-        } else {
-            console.warn(`⚠️ Transaction with ID ${transactionId} not found`);
+        // Learn from this manual assignment if it's a new tag
+        if (tag && tag !== oldTag) {
+            learnFromAssignment(transaction, tag);
         }
+
+        // Recalculate statistics after tag update
+        calculateStatistics();
     }
 
     function addCustomTag(tagName) {
@@ -955,6 +1419,9 @@ export function useTransactionStore() {
     // Initialize custom tags when store is created
     loadCustomTags();
 
+    // Initialize learning system
+    initializeTransactionStore();
+
     return {
         // State
         transactions,
@@ -996,6 +1463,7 @@ export function useTransactionStore() {
         exportTaggedData,
         clearAllData,
         debugCheckDuplicates,
+        fixExistingTagAssignments,
 
         // API stubs
         saveColumnPreferencesToBackend,
@@ -1011,6 +1479,17 @@ export function useTransactionStore() {
         getDetectionStatistics,
 
         // Manual override
-        manuallyOverrideTransaction
+        manuallyOverrideTransaction,
+
+        // Comprehensive tag fixing
+        fixAllExistingTagAssignments,
+
+        // Learning system functions
+        getLearningStatistics,
+        clearLearnedData,
+        exportLearnedRules,
+        importLearnedRules,
+        totalRules,
+        totalAssignments
     };
 }

@@ -78,11 +78,24 @@ function simulateTransactionFiltering(transactions, filterType) {
                 if (amount <= 0) return false;
                 return incomeKeywords.some((keyword) => description.includes(keyword)) || tag === 'income' || category === 'income' || subcategory === 'income';
 
-            case 'expenses':
+            case 'expenses': {
                 // Expenses: negative amounts, excluding savings/investments
                 if (amount >= 0) return false;
-                if (tag === 'savings' || tag === 'investments' || description.includes('bunq') || description.includes('flatex')) return false;
+
+                // Exclude based on tag first (most reliable)
+                if (tag === 'savings' || tag === 'investments') return false;
+
+                // Exclude based on category/subcategory
+                if (category === 'savings' || category === 'investments' || subcategory === 'savings' || subcategory === 'investment' || subcategory === 'etf' || subcategory === 'stock' || subcategory === 'bond') return false;
+
+                // Only exclude bunq/flatex if they're likely savings/investments
+                const isBunqSavings = description.includes('bunq') && (description.includes('savings') || description.includes('deposit') || description.includes('transfer'));
+                const isFlatexInvestment = description.includes('flatex') && (description.includes('investment') || description.includes('purchase') || description.includes('stock') || description.includes('etf'));
+
+                if (isBunqSavings || isFlatexInvestment) return false;
+
                 return true;
+            }
 
             case 'savings':
                 // Savings: negative amounts with savings keywords or tags

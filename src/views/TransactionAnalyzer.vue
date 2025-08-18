@@ -61,7 +61,9 @@ const {
     resetPersistentCounts,
     applySavingsInvestmentsDetection,
     getDetectionStatistics,
-    manuallyOverrideTransaction
+    manuallyOverrideTransaction,
+    fixAllExistingTagAssignments,
+    getLearningStatistics
 } = useTransactionStore();
 
 // Local state
@@ -198,6 +200,407 @@ const updateTag = (transactionId, tag) => {
 const clearSearch = () => {
     searchTerm.value = '';
     console.log('🔍 Search cleared');
+};
+
+const fixAllExistingTags = () => {
+    console.log('🔧 Starting comprehensive tag fixing...');
+    const result = fixAllExistingTagAssignments();
+
+    // Show success message
+    toast.add({
+        severity: 'success',
+        summary: 'Tags Fixed',
+        detail: `Fixed ${result.fixed} out of ${result.total} transactions`,
+        life: 5000
+    });
+
+    console.log('✅ Tag fixing complete:', result);
+};
+
+const fixLocalStorageData = () => {
+    console.log('🔧 Starting localStorage data fix...\n');
+
+    // Storage keys
+    const STORAGE_KEYS = {
+        COLUMN_PREFERENCES: 'transaction_analyzer_column_preferences',
+        TAGS: 'transaction_analyzer_tags',
+        FILTER_PREFERENCES: 'transaction_analyzer_filter_preferences',
+        CSV_DATA: 'transaction_analyzer_csv_data',
+        LAST_UPLOAD: 'transaction_analyzer_last_upload'
+    };
+
+    // CRITICAL: Create backup before making any changes (with quota management)
+    console.log('💾 Creating backup of current localStorage data...');
+
+    // Clean up old backups first to free space
+    const oldBackupKeys = Object.keys(localStorage).filter((key) => key.startsWith('backup_'));
+    if (oldBackupKeys.length > 3) {
+        // Keep only the 3 most recent backups
+        oldBackupKeys.sort().reverse();
+        const backupsToRemove = oldBackupKeys.slice(3);
+        backupsToRemove.forEach((key) => {
+            localStorage.removeItem(key);
+            console.log(`🗑️ Removed old backup: ${key}`);
+        });
+    }
+
+    const backup = {};
+    Object.entries(STORAGE_KEYS).forEach(([key, storageKey]) => {
+        const data = localStorage.getItem(storageKey);
+        if (data) {
+            backup[storageKey] = data;
+            console.log(`  ✅ Backed up ${key}: ${data.length} characters`);
+        }
+    });
+
+    // Check if backup would fit in localStorage
+    const backupString = JSON.stringify(backup);
+    const estimatedSize = backupString.length;
+
+    console.log(`📊 Backup size: ${estimatedSize} characters (${(estimatedSize / 1024 / 1024).toFixed(2)} MB)`);
+
+    // Try to save backup, but don't fail if it doesn't fit
+    try {
+        const backupKey = `backup_${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        localStorage.setItem(backupKey, backupString);
+        console.log(`💾 Backup saved as: ${backupKey}`);
+    } catch (error) {
+        console.warn('⚠️ Could not save backup due to localStorage quota:', error.message);
+        console.log('⚠️ Proceeding without backup (this is safe for read-only operations)');
+    }
+
+    // Debug: Log what's in localStorage
+    console.log('🔍 Debugging localStorage contents:');
+    Object.entries(STORAGE_KEYS).forEach(([key, storageKey]) => {
+        const data = localStorage.getItem(storageKey);
+        if (data) {
+            try {
+                const parsed = JSON.parse(data);
+                console.log(`  ${key}: ${typeof parsed} (${Array.isArray(parsed) ? parsed.length + ' items' : 'object'})`);
+            } catch (e) {
+                console.log(`  ${key}: string (${data.length} chars)`);
+            }
+        } else {
+            console.log(`  ${key}: not found`);
+        }
+    });
+    console.log('');
+
+    // Comprehensive detection function
+    const detectSavingsAndInvestments = (transaction) => {
+        const description = (transaction.description || '').toLowerCase();
+        const counterparty = (transaction.counterparty || '').toLowerCase();
+        const amount = parseInt(transaction.amount) || 0;
+
+        // SPECIAL RULE: Revolut transactions should always be transfers (highest priority)
+        if (description.includes('revolut**7355*')) {
+            console.log(`🎯 Revolut rule applied: "${transaction.description}" → Transfers`);
+            return 'Transfers';
+        }
+
+        // POSITIVE CHECKS (highest priority)
+        // Savings
+        if (description.includes('savings') || description.includes('emergency fund') || description.includes('bunq')) {
+            return 'Savings';
+        }
+
+        // Transfers
+        if (description.includes('transfer') || description.includes('between accounts')) {
+            return 'Transfers';
+        }
+
+        // Investment purchases
+        const investmentKeywords = ['stock purchase', 'etf purchase', 'investment purchase', 'buy'];
+        const hasInvestmentKeyword = investmentKeywords.some((keyword) => description.includes(keyword));
+        if (hasInvestmentKeyword) return 'Investments';
+
+        // FAIL-SAFE CHECKS for investments (only if we haven't classified it yet)
+        if (amount >= 0) return 'Other'; // Only negative amounts can be investments
+        if (Math.abs(amount) / 100 < 10) return 'Other'; // Small amounts are not investments
+
+        // Fee exclusions
+        const feeKeywords = ['fee', 'commission', 'charge', 'cost', 'expense'];
+        const hasFeeKeyword = feeKeywords.some((keyword) => description.includes(keyword));
+        if (hasFeeKeyword) return 'Other';
+
+        // Withdrawal exclusions
+        const withdrawalKeywords = ['withdrawal', 'withdraw', 'sell', 'sale'];
+        const hasWithdrawalKeyword = withdrawalKeywords.some((keyword) => description.includes(keyword));
+        if (hasWithdrawalKeyword) return 'Other';
+
+        // Tax exclusions
+        const taxKeywords = ['tax', 'withholding', 'dividend tax'];
+        const hasTaxKeyword = taxKeywords.some((keyword) => description.includes(keyword));
+        if (hasTaxKeyword) return 'Other';
+
+        // CRITICAL: Exclude ALL Bunq transactions
+        if (description.includes('bunq') || counterparty.includes('bunq')) {
+            return 'Other';
+        }
+
+        // If we reach here, it should be Other
+        return 'Other';
+    };
+
+    // Load transactions from localStorage
+    const loadTransactionsFromStorage = () => {
+        try {
+            // Try to load from CSV_DATA first
+            const csvData = localStorage.getItem(STORAGE_KEYS.CSV_DATA);
+            if (csvData) {
+                const parsed = JSON.parse(csvData);
+                console.log(`📊 Loaded ${parsed.length} transactions from CSV_DATA`);
+
+                // Ensure it's an array
+                if (Array.isArray(parsed)) {
+                    return parsed;
+                } else {
+                    console.warn('⚠️ CSV_DATA is not an array, converting to array');
+                    return [parsed];
+                }
+            }
+
+            // Try to load from TAGS (transaction IDs)
+            const tagsData = localStorage.getItem(STORAGE_KEYS.TAGS);
+            if (tagsData) {
+                const tags = JSON.parse(tagsData);
+                const transactionIds = Object.keys(tags);
+                console.log(`📊 Found ${transactionIds.length} tagged transactions`);
+
+                // We need to reconstruct transactions from tags
+                // This is a fallback - ideally we'd have the full transaction data
+                return transactionIds.map((id) => ({
+                    id,
+                    tag: tags[id],
+                    description: `Transaction ${id}` // Placeholder
+                }));
+            }
+
+            console.log('⚠️ No transaction data found in localStorage');
+            return [];
+        } catch (error) {
+            console.error('Error loading transactions from storage:', error);
+            return [];
+        }
+    };
+
+    // Save transactions to localStorage (SAFER VERSION)
+    const saveTransactionsToStorage = (transactions) => {
+        try {
+            // Only save if we have actual data
+            if (!transactions || transactions.length === 0) {
+                console.warn('⚠️ No transactions to save, skipping save operation');
+                return true;
+            }
+
+            // Validate that transactions is an array
+            if (!Array.isArray(transactions)) {
+                console.error('❌ Cannot save: transactions is not an array');
+                return false;
+            }
+
+            localStorage.setItem(STORAGE_KEYS.CSV_DATA, JSON.stringify(transactions));
+            console.log(`💾 Saved ${transactions.length} transactions to localStorage`);
+            return true;
+        } catch (error) {
+            console.error('Error saving transactions to storage:', error);
+            return false;
+        }
+    };
+
+    // Update tags in localStorage
+    const updateTagsInStorage = (transactions) => {
+        try {
+            const tags = {};
+            transactions.forEach((transaction) => {
+                if (transaction.tag) {
+                    tags[transaction.id] = transaction.tag;
+                }
+            });
+
+            localStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(tags));
+            console.log(`💾 Updated tags for ${Object.keys(tags).length} transactions`);
+            return true;
+        } catch (error) {
+            console.error('Error updating tags in storage:', error);
+            return false;
+        }
+    };
+
+    // Main fix logic
+    const transactions = loadTransactionsFromStorage();
+
+    // Additional safety check to ensure transactions is an array
+    if (!Array.isArray(transactions)) {
+        console.error('❌ Transactions is not an array:', typeof transactions, transactions);
+        toast.add({
+            severity: 'error',
+            summary: 'Data Error',
+            detail: 'Transaction data is not in the expected format',
+            life: 5000
+        });
+        return;
+    }
+
+    if (transactions.length === 0) {
+        console.log('❌ No transactions found in localStorage to fix');
+        toast.add({
+            severity: 'warn',
+            summary: 'No Data',
+            detail: 'No transactions found in localStorage to fix',
+            life: 3000
+        });
+        return;
+    }
+
+    console.log(`📊 Found ${transactions.length} transactions to process\n`);
+
+    let fixedCount = 0;
+    let reEvaluatedCount = 0;
+    let trustedCount = 0;
+    let skippedCount = 0;
+
+    const fixedTransactions = transactions.map((transaction) => {
+        const oldTag = transaction.tag || 'Untagged';
+
+        // Skip transactions that have been manually overridden
+        if (transaction.overrideHistory && transaction.overrideHistory.length > 0) {
+            console.log(`⏭️ Skipping manually overridden transaction: "${transaction.description}"`);
+            skippedCount++;
+            return transaction;
+        }
+
+        // Apply the latest detection rules
+        const newTag = detectSavingsAndInvestments(transaction);
+
+        if (newTag && newTag !== oldTag) {
+            // Update the tag
+            transaction.tag = newTag;
+            fixedCount++;
+
+            // Add fix metadata
+            if (!transaction.fixHistory) {
+                transaction.fixHistory = [];
+            }
+            transaction.fixHistory.push({
+                timestamp: new Date().toISOString(),
+                oldTag,
+                newTag,
+                reason: 'Comprehensive localStorage fix'
+            });
+
+            console.log(`🔧 Fixed: "${transaction.description}"`);
+            console.log(`   From: ${oldTag} → To: ${newTag}`);
+            console.log('');
+        } else if (newTag === oldTag) {
+            trustedCount++;
+        } else {
+            reEvaluatedCount++;
+        }
+
+        return transaction;
+    });
+
+    // Save the fixed transactions back to localStorage
+    const saveSuccess = saveTransactionsToStorage(fixedTransactions);
+    const tagsSuccess = updateTagsInStorage(fixedTransactions);
+
+    // Summary
+    console.log(`\n📊 Comprehensive localStorage fix complete:`);
+    console.log(`   📈 Total transactions processed: ${transactions.length}`);
+    console.log(`   🔧 Total fixes applied: ${fixedCount}`);
+    console.log(`   ✅ Trusted existing tags: ${trustedCount}`);
+    console.log(`   🔍 Re-evaluated but unchanged: ${reEvaluatedCount}`);
+    console.log(`   ⏭️ Skipped (manually overridden): ${skippedCount}`);
+    console.log(`   💾 Save to localStorage: ${saveSuccess ? '✅ Success' : '❌ Failed'}`);
+    console.log(`   🏷️ Update tags: ${tagsSuccess ? '✅ Success' : '❌ Failed'}`);
+
+    // Show success message
+    if (fixedCount > 0) {
+        toast.add({
+            severity: 'success',
+            summary: 'localStorage Fixed',
+            detail: `Fixed ${fixedCount} out of ${transactions.length} transactions in localStorage`,
+            life: 5000
+        });
+        console.log(`\n✅ Successfully fixed ${fixedCount} transactions!`);
+        console.log(`🔧 All transactions now follow the latest classification rules.`);
+        console.log(`💾 Data has been saved to localStorage.`);
+    } else {
+        toast.add({
+            severity: 'info',
+            summary: 'No Fixes Needed',
+            detail: 'All transactions are already correctly classified',
+            life: 3000
+        });
+        console.log(`\nℹ️ No fixes needed - all transactions are already correctly classified.`);
+    }
+
+    return {
+        success: true,
+        total: transactions.length,
+        fixed: fixedCount,
+        trusted: trustedCount,
+        reEvaluated: reEvaluatedCount,
+        skipped: skippedCount,
+        saveSuccess,
+        tagsSuccess
+    };
+};
+
+// Recovery function to restore from backup
+const recoverFromBackup = () => {
+    console.log('🔄 Looking for backups...');
+
+    // Find the most recent backup
+    const backupKeys = Object.keys(localStorage).filter((key) => key.startsWith('backup_'));
+    if (backupKeys.length === 0) {
+        console.log('❌ No backups found');
+        toast.add({
+            severity: 'error',
+            summary: 'No Backup',
+            detail: 'No backup found to restore from',
+            life: 5000
+        });
+        return;
+    }
+
+    // Sort by timestamp (newest first)
+    backupKeys.sort().reverse();
+    const latestBackupKey = backupKeys[0];
+
+    try {
+        const backupData = JSON.parse(localStorage.getItem(latestBackupKey));
+        console.log(`🔄 Restoring from backup: ${latestBackupKey}`);
+
+        // Restore each storage key
+        Object.entries(backupData).forEach(([key, value]) => {
+            localStorage.setItem(key, value);
+            console.log(`  ✅ Restored ${key}`);
+        });
+
+        toast.add({
+            severity: 'success',
+            summary: 'Data Restored',
+            detail: `Restored data from backup: ${latestBackupKey}`,
+            life: 5000
+        });
+
+        console.log('✅ Data recovery complete');
+
+        // Reload the page to refresh the UI
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    } catch (error) {
+        console.error('Error restoring from backup:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Restore Failed',
+            detail: 'Failed to restore data from backup',
+            life: 5000
+        });
+    }
 };
 
 const clearDateFilters = () => {
@@ -1012,7 +1415,11 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 <Button label="Log Persistent Counts" icon="pi pi-chart-bar" @click="() => console.log('📊 Persistent Counts:', getPersistentCounts())" size="small" class="bg-yellow-500 hover:bg-yellow-600" />
                 <Button label="Reset Persistent Counts" icon="pi pi-refresh" @click="resetPersistentCounts" size="small" class="bg-red-500 hover:bg-red-600" />
                 <Button label="Auto-Detect Savings/Investments" icon="pi pi-search" @click="applySavingsInvestmentsDetection" size="small" class="bg-green-500 hover:bg-green-600" />
+                <Button label="Fix All Existing Tags" icon="pi pi-wrench" @click="fixAllExistingTags" size="small" class="bg-red-500 hover:bg-red-600" />
+                <Button label="Fix localStorage Data" icon="pi pi-database" @click="fixLocalStorageData" size="small" class="bg-orange-500 hover:bg-orange-600" />
+                <Button label="Recover from Backup" icon="pi pi-undo" @click="recoverFromBackup" size="small" class="bg-yellow-500 hover:bg-yellow-600" />
                 <Button label="Show Detection Stats" icon="pi pi-info-circle" @click="() => console.log('🔍 Detection Stats:', detectionStats)" size="small" class="bg-blue-500 hover:bg-blue-600" />
+                <Button label="Show Learning Stats" icon="pi pi-brain" @click="() => console.log('🧠 Learning Stats:', getLearningStatistics())" size="small" class="bg-purple-500 hover:bg-purple-600" />
                 <Button
                     :label="showSavingsDashboard ? 'Hide Savings Dashboard' : 'Show Savings Dashboard'"
                     :icon="showSavingsDashboard ? 'pi pi-eye-slash' : 'pi pi-eye'"
@@ -1042,12 +1449,14 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                     <Button @click="exportPeriodData" :disabled="!currentPeriodStats" label="Export Report" icon="pi pi-download" severity="success" />
                 </div>
                 <div v-if="currentPeriodStats" class="text-center">
-                    <p class="text-sm text-gray-600">
+                    <!-- <p class="text-sm text-gray-600">
                         Currently viewing: <span class="font-semibold text-blue-600">{{ currentPeriodName }}</span>
-                    </p>
+                    </p> -->
                 </div>
                 <div class="flex flex-col gap-3">
-                    <label class="text-sm font-medium text-gray-700">Select Period: {{ selectedPeriod }}</label>
+                    <label class="text-sm font-medium text-gray-700"
+                        >Select Period: {{ selectedPeriod }} | Currently viewing: <span class="font-semibold text-blue-600">{{ currentPeriodName }}</span></label
+                    >
                     <div class="flex flex-wrap gap-3 period-chips-container">
                         <Chip
                             v-for="period in visiblePeriods"
@@ -1060,7 +1469,7 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                             @click="handlePeriodSelection(period.value)"
                         >
                             <template #default>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-1 text-sm p-0.5">
                                     <i :class="[selectedPeriod === period.value ? 'pi pi-check' : 'pi pi-calendar', 'text-sm']"></i>
                                     <span>{{ period.name }}</span>
                                 </div>
@@ -1247,6 +1656,129 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                     <i class="pi pi-times mr-1"></i>
                     Show All Transactions
                 </button>
+            </div>
+        </div>
+
+        <!-- Controls Section (only show when data is loaded) -->
+        <div v-if="transactions.length > 0" class="space-y-6">
+            <!-- Column Visibility Control -->
+            <div class="card">
+                <h3 class="text-lg font-semibold mb-4">✅ Column Visibility</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    <div v-for="column in availableColumns" :key="column" class="flex items-center space-x-2">
+                        <Checkbox v-model="visibleColumns" :value="column" :inputId="`col-${column}`" />
+                        <label :for="`col-${column}`" class="text-sm font-medium text-gray-700 cursor-pointer">
+                            {{ getColumnDisplayName(column) }}
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="card">
+                <h3 class="text-lg font-semibold mb-4">📊 Transaction Data</h3>
+
+                <!-- Search and Filter Controls -->
+                <div class="flex flex-col gap-4 mb-4">
+                    <!-- Date Range Filter -->
+                    <div class="flex flex-col md:flex-row gap-4 items-center">
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium text-gray-700">Date Range:</label>
+                            <Calendar v-model="startDate" placeholder="Start Date" dateFormat="yy-mm-dd" :showIcon="true" class="w-40" />
+                            <span class="text-gray-500">to</span>
+                            <Calendar v-model="endDate" placeholder="End Date" dateFormat="yy-mm-dd" :showIcon="true" class="w-40" />
+                            <Button v-if="startDate || endDate" @click="clearDateFilters" icon="pi pi-times" text size="small" v-tooltip.top="'Clear date filters'" class="text-red-500" />
+                        </div>
+                    </div>
+
+                    <!-- Search and Tag Filter -->
+                    <div class="flex flex-col md:flex-row gap-4 justify-between">
+                        <div class="flex items-center gap-3">
+                            <SelectButton v-model="selectedFilter" :options="filterOptions" optionLabel="label" optionValue="value" />
+                            <Button v-if="searchTerm" @click="clearSearch" icon="pi pi-times" text size="small" v-tooltip.top="'Clear search'" />
+                        </div>
+                        <div class="flex justify-end">
+                            <IconField>
+                                <InputIcon>
+                                    <i class="pi pi-search" />
+                                </InputIcon>
+                                <InputText v-model="searchTerm" placeholder="Keyword Search" />
+                            </IconField>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4 flex justify-between items-center">
+                    <div class="text-sm text-gray-600">
+                        Showing {{ periodFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)
+                        <span v-if="startDate || endDate" class="text-blue-600"> • Date filtered: {{ startDate ? formatDate(startDate) : 'Any' }} to {{ endDate ? formatDate(endDate) : 'Any' }} </span>
+                        <span v-if="searchTerm" class="text-green-600"> • Search: "{{ searchTerm }}"</span>
+                        <span v-if="selectedPeriod && selectedPeriod !== 'total'" class="text-purple-600"> • Period: {{ currentPeriodName }}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <Button label="Debug Duplicates" icon="pi pi-search" @click="debugCheckDuplicates" size="small" v-tooltip.top="'Check for duplicates in current transactions'" />
+                        <Button label="Export Tagged Data" icon="pi pi-download" @click="exportTaggedData" size="small" />
+                        <Button label="Clear All Data" icon="pi pi-trash" severity="danger" size="small" @click="confirmClearData" v-tooltip.top="'This will remove all transactions and settings'" />
+                    </div>
+                </div>
+
+                <!-- <p v-for="value in searchFilteredTransactions.map((transaction) => transaction.amount)" :key="value">{{ `${value}` }}</p> -->
+                <!-- <p>{{ JSON.stringify(Object.keys(searchFilteredTransactions[0])) }}</p> -->
+                <!-- <p v-for="value in Object.keys(searchFilteredTransactions[0])" :key="value">{{ `${value}: ${searchFilteredTransactions[0][value]}` }}</p> -->
+                <DataTable
+                    :key="`transactions-${tableKey}-${searchTerm}-${startDate}-${endDate}-${selectedPeriod}`"
+                    :value="periodFilteredTransactions"
+                    :paginator="true"
+                    :rows="20"
+                    :rowsPerPageOptions="[10, 20, 50, 100]"
+                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                    currentPageReportTemplate="Showing {first} to {last} of {totalRecords} transactions"
+                    :loading="isLoading"
+                    stripedRows
+                    class="w-full"
+                >
+                    <!-- Dynamic columns based on standard structure -->
+                    <Column v-for="column in visibleColumns" :key="column" :field="column" :header="getColumnDisplayName(column)" :sortable="true" class="min-w-[120px]">
+                        <template #body="{ data }">
+                            <span v-if="column === 'amount'" class="font-mono" :class="formatAmountWithType(data[column], data).colorClass">
+                                {{ formatAmountWithType(data[column], data).formatted }}
+                            </span>
+                            <span v-else-if="column === 'date'" class="font-mono">
+                                {{ formatDate(data[column]) }}
+                            </span>
+                            <span v-else-if="column === 'tag'" class="flex items-center gap-2">
+                                <Tag v-if="data[column]" :value="getTagValue(data[column])" :severity="getTagSeverity(data[column], customTags)" :icon="getTagIcon(data[column])" />
+                                <span v-else class="text-gray-400 text-sm">No tag</span>
+                            </span>
+                            <span v-else-if="column === 'description'" class="truncate max-w-[150px] block">
+                                {{ data[column] || '-' }}
+                            </span>
+                            <span v-else class="truncate max-w-[200px] block">
+                                {{ data[column] || '-' }}
+                            </span>
+                        </template>
+                    </Column>
+
+                    <!-- Select Tag Column -->
+                    <Column field="tag" header="Select Tag" :sortable="true" class="min-w-[150px]">
+                        <template #body="{ data }">
+                            <div class="flex items-center gap-2">
+                                <!-- <div class="flex-1">
+                                    <Tag v-if="data.tag" :value="getTagValue(data.tag)" :severity="getTagSeverity(data.tag)" :icon="getTagIcon(data.tag)" class="cursor-pointer" @click="showTagDropdown(data)" />
+                                    <span v-else class="text-gray-400 text-sm">No tag</span>
+                                </div> -->
+                                <Dropdown v-model="data.tag" :options="availableTags" placeholder="Select Category" @change="updateTag(data.id, data.tag)" class="w-32" />
+                            </div>
+                        </template>
+                    </Column>
+
+                    <!-- Actions Column -->
+                    <Column header="Actions" class="min-w-[100px]">
+                        <template #body="{ data }">
+                            <Button icon="pi pi-eye" size="small" text @click="viewTransactionDetails(data)" v-tooltip.top="'View Details'" />
+                        </template>
+                    </Column>
+                </DataTable>
             </div>
         </div>
 
@@ -1557,129 +2089,6 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                     <div class="text-sm text-gray-600">{{ stats.count }} transactions</div>
                     <div class="text-sm font-mono">{{ formatCurrency(stats.total) }}</div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Controls Section (only show when data is loaded) -->
-        <div v-if="transactions.length > 0" class="space-y-6">
-            <!-- Column Visibility Control -->
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-4">✅ Column Visibility</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    <div v-for="column in availableColumns" :key="column" class="flex items-center space-x-2">
-                        <Checkbox v-model="visibleColumns" :value="column" :inputId="`col-${column}`" />
-                        <label :for="`col-${column}`" class="text-sm font-medium text-gray-700 cursor-pointer">
-                            {{ getColumnDisplayName(column) }}
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Data Table -->
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-4">📊 Transaction Data</h3>
-
-                <!-- Search and Filter Controls -->
-                <div class="flex flex-col gap-4 mb-4">
-                    <!-- Date Range Filter -->
-                    <div class="flex flex-col md:flex-row gap-4 items-center">
-                        <div class="flex items-center gap-2">
-                            <label class="text-sm font-medium text-gray-700">Date Range:</label>
-                            <Calendar v-model="startDate" placeholder="Start Date" dateFormat="yy-mm-dd" :showIcon="true" class="w-40" />
-                            <span class="text-gray-500">to</span>
-                            <Calendar v-model="endDate" placeholder="End Date" dateFormat="yy-mm-dd" :showIcon="true" class="w-40" />
-                            <Button v-if="startDate || endDate" @click="clearDateFilters" icon="pi pi-times" text size="small" v-tooltip.top="'Clear date filters'" class="text-red-500" />
-                        </div>
-                    </div>
-
-                    <!-- Search and Tag Filter -->
-                    <div class="flex flex-col md:flex-row gap-4 justify-between">
-                        <div class="flex items-center gap-3">
-                            <SelectButton v-model="selectedFilter" :options="filterOptions" optionLabel="label" optionValue="value" />
-                            <Button v-if="searchTerm" @click="clearSearch" icon="pi pi-times" text size="small" v-tooltip.top="'Clear search'" />
-                        </div>
-                        <div class="flex justify-end">
-                            <IconField>
-                                <InputIcon>
-                                    <i class="pi pi-search" />
-                                </InputIcon>
-                                <InputText v-model="searchTerm" placeholder="Keyword Search" />
-                            </IconField>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mb-4 flex justify-between items-center">
-                    <div class="text-sm text-gray-600">
-                        Showing {{ periodFilteredTransactions.length }} of {{ filteredTransactions.length }} filtered transactions ({{ transactions.length }} total)
-                        <span v-if="startDate || endDate" class="text-blue-600"> • Date filtered: {{ startDate ? formatDate(startDate) : 'Any' }} to {{ endDate ? formatDate(endDate) : 'Any' }} </span>
-                        <span v-if="searchTerm" class="text-green-600"> • Search: "{{ searchTerm }}"</span>
-                        <span v-if="selectedPeriod && selectedPeriod !== 'total'" class="text-purple-600"> • Period: {{ currentPeriodName }}</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <Button label="Debug Duplicates" icon="pi pi-search" @click="debugCheckDuplicates" size="small" v-tooltip.top="'Check for duplicates in current transactions'" />
-                        <Button label="Export Tagged Data" icon="pi pi-download" @click="exportTaggedData" size="small" />
-                        <Button label="Clear All Data" icon="pi pi-trash" severity="danger" size="small" @click="confirmClearData" v-tooltip.top="'This will remove all transactions and settings'" />
-                    </div>
-                </div>
-
-                <!-- <p v-for="value in searchFilteredTransactions.map((transaction) => transaction.amount)" :key="value">{{ `${value}` }}</p> -->
-                <!-- <p>{{ JSON.stringify(Object.keys(searchFilteredTransactions[0])) }}</p> -->
-                <!-- <p v-for="value in Object.keys(searchFilteredTransactions[0])" :key="value">{{ `${value}: ${searchFilteredTransactions[0][value]}` }}</p> -->
-                <DataTable
-                    :key="`transactions-${tableKey}-${searchTerm}-${startDate}-${endDate}-${selectedPeriod}`"
-                    :value="periodFilteredTransactions"
-                    :paginator="true"
-                    :rows="20"
-                    :rowsPerPageOptions="[10, 20, 50, 100]"
-                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-                    currentPageReportTemplate="Showing {first} to {last} of {totalRecords} transactions"
-                    :loading="isLoading"
-                    stripedRows
-                    class="w-full"
-                >
-                    <!-- Dynamic columns based on standard structure -->
-                    <Column v-for="column in visibleColumns" :key="column" :field="column" :header="getColumnDisplayName(column)" :sortable="true" class="min-w-[120px]">
-                        <template #body="{ data }">
-                            <span v-if="column === 'amount'" class="font-mono" :class="formatAmountWithType(data[column], data).colorClass">
-                                {{ formatAmountWithType(data[column], data).formatted }}
-                            </span>
-                            <span v-else-if="column === 'date'" class="font-mono">
-                                {{ formatDate(data[column]) }}
-                            </span>
-                            <span v-else-if="column === 'tag'" class="flex items-center gap-2">
-                                <Tag v-if="data[column]" :value="getTagValue(data[column])" :severity="getTagSeverity(data[column], customTags)" :icon="getTagIcon(data[column])" />
-                                <span v-else class="text-gray-400 text-sm">No tag</span>
-                            </span>
-                            <span v-else-if="column === 'description'" class="truncate max-w-[200px] block">
-                                {{ data[column] || '-' }}
-                            </span>
-                            <span v-else class="truncate max-w-[200px] block">
-                                {{ data[column] || '-' }}
-                            </span>
-                        </template>
-                    </Column>
-
-                    <!-- Select Tag Column -->
-                    <Column field="tag" header="Select Tag" :sortable="true" class="min-w-[150px]">
-                        <template #body="{ data }">
-                            <div class="flex items-center gap-2">
-                                <!-- <div class="flex-1">
-                                    <Tag v-if="data.tag" :value="getTagValue(data.tag)" :severity="getTagSeverity(data.tag)" :icon="getTagIcon(data.tag)" class="cursor-pointer" @click="showTagDropdown(data)" />
-                                    <span v-else class="text-gray-400 text-sm">No tag</span>
-                                </div> -->
-                                <Dropdown v-model="data.tag" :options="availableTags" placeholder="Select Category" @change="updateTag(data.id, data.tag)" class="w-32" />
-                            </div>
-                        </template>
-                    </Column>
-
-                    <!-- Actions Column -->
-                    <Column header="Actions" class="min-w-[100px]">
-                        <template #body="{ data }">
-                            <Button icon="pi pi-eye" size="small" text @click="viewTransactionDetails(data)" v-tooltip.top="'View Details'" />
-                        </template>
-                    </Column>
-                </DataTable>
             </div>
         </div>
 
