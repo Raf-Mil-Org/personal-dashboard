@@ -61,7 +61,6 @@ const {
     getDetectionStatistics,
     manuallyOverrideTransaction,
     fixAllExistingTagAssignments,
-    getLearningStatistics,
     extractAndMergeAllRules
 } = useTransactionStore();
 
@@ -1415,8 +1414,6 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 <Button label="Extract & Merge All Rules" icon="pi pi-sitemap" @click="extractAndMergeAllRules" size="small" class="bg-purple-500 hover:bg-purple-600" />
                 <Button label="Fix localStorage Data" icon="pi pi-database" @click="fixLocalStorageData" size="small" class="bg-orange-500 hover:bg-orange-600" />
                 <Button label="Recover from Backup" icon="pi pi-undo" @click="recoverFromBackup" size="small" class="bg-yellow-500 hover:bg-yellow-600" />
-                <Button label="Show Detection Stats" icon="pi pi-info-circle" @click="() => console.log('🔍 Detection Stats:', detectionStats)" size="small" class="bg-blue-500 hover:bg-blue-600" />
-                <Button label="Show Learning Stats" icon="pi pi-brain" @click="() => console.log('🧠 Learning Stats:', getLearningStatistics())" size="small" class="bg-purple-500 hover:bg-purple-600" />
                 <Button
                     :label="showSavingsDashboard ? 'Hide Savings Dashboard' : 'Show Savings Dashboard'"
                     :icon="showSavingsDashboard ? 'pi pi-eye-slash' : 'pi pi-eye'"

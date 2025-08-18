@@ -92,9 +92,9 @@ export function useTransactionLearning() {
     const extractPatterns = (description) => {
         const patterns = [];
         const words = description.toLowerCase().split(/\s+/);
-        
+
         // Single word patterns
-        words.forEach(word => {
+        words.forEach((word) => {
             if (word.length >= 3) {
                 patterns.push({
                     type: 'exact_word',
@@ -117,18 +117,9 @@ export function useTransactionLearning() {
         }
 
         // Special patterns (like Revolut**7355*)
-        const specialPatterns = [
-            /revolut\*\*\d+\*/i,
-            /bunq/i,
-            /degiro/i,
-            /trading212/i,
-            /etoro/i,
-            /coinbase/i,
-            /binance/i,
-            /kraken/i
-        ];
+        const specialPatterns = [/revolut\*\*\d+\*/i, /bunq/i, /degiro/i, /trading212/i, /etoro/i, /coinbase/i, /binance/i, /kraken/i];
 
-        specialPatterns.forEach(regex => {
+        specialPatterns.forEach((regex) => {
             const match = description.match(regex);
             if (match) {
                 patterns.push({
@@ -176,7 +167,7 @@ export function useTransactionLearning() {
 
         // Group assignments by tag
         const assignmentsByTag = {};
-        manualAssignments.value.forEach(assignment => {
+        manualAssignments.value.forEach((assignment) => {
             if (!assignmentsByTag[assignment.assignedTag]) {
                 assignmentsByTag[assignment.assignedTag] = [];
             }
@@ -185,7 +176,8 @@ export function useTransactionLearning() {
 
         // Create rules for each tag
         Object.entries(assignmentsByTag).forEach(([tag, assignments]) => {
-            if (assignments.length >= 2) { // Need at least 2 assignments to create a rule
+            if (assignments.length >= 2) {
+                // Need at least 2 assignments to create a rule
                 createRuleFromAssignments(tag, assignments);
             }
         });
@@ -204,9 +196,9 @@ export function useTransactionLearning() {
         const subcategoryFrequency = {};
         const counterpartyFrequency = {};
 
-        assignments.forEach(assignment => {
+        assignments.forEach((assignment) => {
             // Count pattern frequencies
-            assignment.patterns.forEach(pattern => {
+            assignment.patterns.forEach((pattern) => {
                 const key = `${pattern.type}:${pattern.pattern}`;
                 if (!patternFrequency[key]) {
                     patternFrequency[key] = { count: 0, confidence: pattern.confidence };
@@ -310,7 +302,7 @@ export function useTransactionLearning() {
             };
 
             // Check if similar rule already exists
-            const existingRuleIndex = learnedRules.value.findIndex(r => r.tag === tag);
+            const existingRuleIndex = learnedRules.value.findIndex((r) => r.tag === tag);
             if (existingRuleIndex !== -1) {
                 // Update existing rule
                 learnedRules.value[existingRuleIndex] = rule;
@@ -333,11 +325,11 @@ export function useTransactionLearning() {
         let bestMatch = null;
         let bestConfidence = 0;
 
-        learnedRules.value.forEach(rule => {
+        learnedRules.value.forEach((rule) => {
             let ruleConfidence = 0;
             let matchingConditions = 0;
 
-            rule.conditions.forEach(condition => {
+            rule.conditions.forEach((condition) => {
                 let conditionMet = false;
 
                 switch (condition.type) {
@@ -374,7 +366,7 @@ export function useTransactionLearning() {
             // Calculate overall rule confidence
             if (matchingConditions > 0) {
                 ruleConfidence = ruleConfidence / rule.conditions.length;
-                
+
                 if (ruleConfidence > bestConfidence) {
                     bestConfidence = ruleConfidence;
                     bestMatch = rule;
@@ -382,7 +374,8 @@ export function useTransactionLearning() {
             }
         });
 
-        if (bestMatch && bestConfidence > 0.6) { // Minimum confidence threshold
+        if (bestMatch && bestConfidence > 0.6) {
+            // Minimum confidence threshold
             // Update rule usage statistics
             bestMatch.lastUsed = new Date().toISOString();
             bestMatch.usageCount++;
@@ -410,7 +403,7 @@ export function useTransactionLearning() {
         };
 
         // Count rules by tag
-        learnedRules.value.forEach(rule => {
+        learnedRules.value.forEach((rule) => {
             if (!stats.rulesByTag[rule.tag]) {
                 stats.rulesByTag[rule.tag] = 0;
             }
@@ -418,14 +411,10 @@ export function useTransactionLearning() {
         });
 
         // Get most used rules
-        stats.mostUsedRules = [...learnedRules.value]
-            .sort((a, b) => b.usageCount - a.usageCount)
-            .slice(0, 5);
+        stats.mostUsedRules = [...learnedRules.value].sort((a, b) => b.usageCount - a.usageCount).slice(0, 5);
 
         // Get recent rules
-        stats.recentRules = [...learnedRules.value]
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            .slice(0, 5);
+        stats.recentRules = [...learnedRules.value].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
 
         ruleStatistics.value = stats;
         saveRuleStatistics();
@@ -433,27 +422,16 @@ export function useTransactionLearning() {
         return stats;
     };
 
-    // Get learning statistics
-    const getLearningStatistics = () => {
-        return {
-            totalRules: learnedRules.value.length,
-            totalAssignments: manualAssignments.value.length,
-            rulesByTag: ruleStatistics.value.rulesByTag || {},
-            mostUsedRules: ruleStatistics.value.mostUsedRules || [],
-            recentRules: ruleStatistics.value.recentRules || []
-        };
-    };
-
     // Clear all learned data
     const clearLearnedData = () => {
         learnedRules.value = [];
         manualAssignments.value = [];
         ruleStatistics.value = {};
-        
+
         localStorage.removeItem(LEARNING_STORAGE_KEYS.LEARNED_RULES);
         localStorage.removeItem(LEARNING_STORAGE_KEYS.MANUAL_ASSIGNMENTS);
         localStorage.removeItem(LEARNING_STORAGE_KEYS.RULE_STATISTICS);
-        
+
         console.log('🗑️ Cleared all learned data');
     };
 
@@ -493,7 +471,7 @@ export function useTransactionLearning() {
     // Computed properties
     const rulesByTag = computed(() => {
         const grouped = {};
-        learnedRules.value.forEach(rule => {
+        learnedRules.value.forEach((rule) => {
             if (!grouped[rule.tag]) {
                 grouped[rule.tag] = [];
             }
@@ -518,7 +496,6 @@ export function useTransactionLearning() {
         analyzeAndCreateRules,
 
         // Statistics and management
-        getLearningStatistics,
         updateRuleStatistics,
         clearLearnedData,
         exportLearnedRules,

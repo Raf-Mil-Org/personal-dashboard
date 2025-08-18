@@ -9,7 +9,7 @@ const mockLearningSystem = {
 
     learnFromAssignment(transaction, assignedTag) {
         console.log(`🧠 Learning from assignment: "${transaction.description}" → "${assignedTag}"`);
-        
+
         const assignment = {
             id: Date.now().toString(),
             timestamp: new Date().toISOString(),
@@ -25,16 +25,16 @@ const mockLearningSystem = {
 
         this.manualAssignments.push(assignment);
         console.log(`📝 Added manual assignment: ${assignment.id}`);
-        
+
         return assignment;
     },
 
     extractPatterns(description) {
         const patterns = [];
         const words = description.toLowerCase().split(/\s+/);
-        
+
         // Single word patterns
-        words.forEach(word => {
+        words.forEach((word) => {
             if (word.length >= 3) {
                 patterns.push({
                     type: 'exact_word',
@@ -57,14 +57,9 @@ const mockLearningSystem = {
         }
 
         // Special patterns
-        const specialPatterns = [
-            /revolut\*\*\d+\*/i,
-            /bunq/i,
-            /degiro/i,
-            /trading212/i
-        ];
+        const specialPatterns = [/revolut\*\*\d+\*/i, /bunq/i, /degiro/i, /trading212/i];
 
-        specialPatterns.forEach(regex => {
+        specialPatterns.forEach((regex) => {
             const match = description.match(regex);
             if (match) {
                 patterns.push({
@@ -80,21 +75,21 @@ const mockLearningSystem = {
 
     applyLearnedRules(transaction) {
         const description = (transaction.description || '').toLowerCase();
-        
+
         // Simple rule matching for testing
         for (const rule of this.learnedRules) {
             let matches = 0;
             let totalConditions = rule.conditions.length;
-            
-            rule.conditions.forEach(condition => {
+
+            rule.conditions.forEach((condition) => {
                 if (condition.type === 'pattern') {
                     if (description.includes(condition.pattern.toLowerCase())) {
                         matches++;
                     }
                 }
             });
-            
-            if (matches > 0 && (matches / totalConditions) > 0.5) {
+
+            if (matches > 0 && matches / totalConditions > 0.5) {
                 console.log(`🎯 Applied learned rule: "${transaction.description}" → "${rule.tag}"`);
                 return {
                     tag: rule.tag,
@@ -103,16 +98,16 @@ const mockLearningSystem = {
                 };
             }
         }
-        
+
         return null;
     },
 
     analyzeAndCreateRules() {
         console.log('🔍 Analyzing manual assignments to create rules...');
-        
+
         // Group assignments by tag
         const assignmentsByTag = {};
-        this.manualAssignments.forEach(assignment => {
+        this.manualAssignments.forEach((assignment) => {
             if (!assignmentsByTag[assignment.assignedTag]) {
                 assignmentsByTag[assignment.assignedTag] = [];
             }
@@ -123,11 +118,11 @@ const mockLearningSystem = {
         Object.entries(assignmentsByTag).forEach(([tag, assignments]) => {
             if (assignments.length >= 2) {
                 const conditions = [];
-                
+
                 // Find common patterns
                 const patternCounts = {};
-                assignments.forEach(assignment => {
-                    assignment.patterns.forEach(pattern => {
+                assignments.forEach((assignment) => {
+                    assignment.patterns.forEach((pattern) => {
                         const key = `${pattern.type}:${pattern.pattern}`;
                         patternCounts[key] = (patternCounts[key] || 0) + 1;
                     });
@@ -160,7 +155,7 @@ const mockLearningSystem = {
                     };
 
                     // Update or add rule
-                    const existingIndex = this.learnedRules.findIndex(r => r.tag === tag);
+                    const existingIndex = this.learnedRules.findIndex((r) => r.tag === tag);
                     if (existingIndex !== -1) {
                         this.learnedRules[existingIndex] = rule;
                         console.log(`🔄 Updated rule for tag "${tag}"`);
@@ -171,17 +166,6 @@ const mockLearningSystem = {
                 }
             }
         });
-    },
-
-    getLearningStatistics() {
-        return {
-            totalRules: this.learnedRules.length,
-            totalAssignments: this.manualAssignments.length,
-            rulesByTag: this.learnedRules.reduce((acc, rule) => {
-                acc[rule.tag] = (acc[rule.tag] || 0) + 1;
-                return acc;
-            }, {})
-        };
     }
 };
 
@@ -252,11 +236,6 @@ testTransactions.forEach((transaction, index) => {
         console.log(`❌ Transaction ${index + 1}: "${transaction.description}" → No rule applied`);
     }
 });
-
-// Step 4: Show statistics
-console.log('\n📊 Step 4: Learning statistics');
-const stats = mockLearningSystem.getLearningStatistics();
-console.log('Statistics:', stats);
 
 console.log('\n🎉 Learning system test complete!');
 console.log('✅ The system successfully:');

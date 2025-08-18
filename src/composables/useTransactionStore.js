@@ -26,7 +26,7 @@ const DEFAULT_TAGS = ['Groceries', 'Utilities', 'Dining', 'Transport', 'Health',
 
 export function useTransactionStore() {
     // Initialize learning system
-    const { initializeLearning, learnFromAssignment, applyLearnedRules, getLearningStatistics, clearLearnedData, exportLearnedRules, importLearnedRules, totalRules, totalAssignments } = useTransactionLearning();
+    const { initializeLearning, learnFromAssignment, applyLearnedRules, clearLearnedData, exportLearnedRules, importLearnedRules, totalRules, totalAssignments } = useTransactionLearning();
 
     // State
     const transactions = ref([]);
@@ -1445,7 +1445,6 @@ export function useTransactionStore() {
         fixAllExistingTagAssignments,
 
         // Learning system functions
-        getLearningStatistics,
         clearLearnedData,
         exportLearnedRules,
         importLearnedRules,
