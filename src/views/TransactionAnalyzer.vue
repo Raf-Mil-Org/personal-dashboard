@@ -2173,7 +2173,7 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
         </Dialog>
 
         <!-- Documentation Dialog -->
-        <Dialog v-model:visible="showDocumentation" modal header="Transaction Analyzer Documentation" :style="{ width: '800px' }">
+        <Dialog v-model:visible="showDocumentation" modal header="Transaction Analyzer Documentation" :style="{ width: '900px' }">
             <div class="space-y-6">
                 <div>
                     <h3 class="text-lg font-semibold mb-2">📁 Supported File Formats</h3>
@@ -2190,36 +2190,206 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">🏷️ Tag Mapping System</h3>
-                    <p class="text-sm text-gray-600 mb-3">The system automatically assigns tags to transactions based on category and subcategory information:</p>
+                    <h3 class="text-lg font-semibold mb-2">🏷️ Comprehensive Tag Classification System</h3>
+                    <p class="text-sm text-gray-600 mb-3">Advanced transaction classification with multiple rule types and priorities:</p>
                     <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                        <li>If a transaction already has a tag, it will be preserved</li>
-                        <li>If no tag exists, the system will map category/subcategory combinations to tags</li>
-                        <li>You can customize these mappings in the Tag Mapping Manager</li>
-                        <li>Default mappings cover common categories like Groceries, Transport, Dining, etc.</li>
+                        <li><strong>Priority 1:</strong> Special rules (e.g., Revolut transactions → Transfers)</li>
+                        <li><strong>Priority 2:</strong> User-defined tag mappings (highest priority)</li>
+                        <li><strong>Priority 3:</strong> Existing tag validation against current rules</li>
+                        <li><strong>Priority 4:</strong> Category assignment based on hardcoded rules</li>
+                        <li><strong>Priority 5:</strong> Tag assignment based on hardcoded rules</li>
+                        <li><strong>Enhanced Validation:</strong> Strict checks for investment tags with category/subcategory validation</li>
                     </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">🔄 Duplicate Detection</h3>
-                    <p class="text-sm text-gray-600 mb-3">The system automatically detects and prevents duplicate transactions:</p>
+                    <h3 class="text-lg font-semibold mb-2">🔄 Step-by-Step Classification Process</h3>
+                    <p class="text-sm text-gray-600 mb-3">Here's exactly how the system processes each transaction:</p>
+
+                    <div class="space-y-4">
+                        <!-- Step 1 -->
+                        <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
+                            <h4 class="font-semibold text-blue-800 mb-2">Step 1: Transaction Input & Preprocessing</h4>
+                            <div class="text-sm text-blue-700 space-y-1">
+                                <p><strong>Input:</strong> Transaction data (description, amount, category, subcategory, counterparty)</p>
+                                <p><strong>Preprocessing:</strong> Convert all text to lowercase, extract key information</p>
+                                <p><strong>Validation:</strong> Check for required fields and data integrity</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
+                            <h4 class="font-semibold text-green-800 mb-2">Step 2: Priority 1 - Special Rules (Highest Priority)</h4>
+                            <div class="text-sm text-green-700 space-y-1">
+                                <p><strong>Revolut Rule:</strong> If description contains "revolut" → Tag as "Transfers"</p>
+                                <p><strong>Bunq Rule:</strong> If description contains "bunq" → Tag as "Savings" (prevents Investment misclassification)</p>
+                                <p><strong>Result:</strong> If any special rule matches, classification stops here</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-400">
+                            <h4 class="font-semibold text-purple-800 mb-2">Step 3: Priority 2 - User-Defined Tag Mappings</h4>
+                            <div class="text-sm text-purple-700 space-y-1">
+                                <p><strong>Check:</strong> Look for custom mapping: category + subcategory → tag</p>
+                                <p><strong>Example:</strong> category="other", subcategory="credit card" → tag="Other"</p>
+                                <p><strong>Example:</strong> category="other", subcategory="charity" → tag="Gift"</p>
+                                <p><strong>Result:</strong> If mapping found, apply with 0.9 confidence and stop</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 4 -->
+                        <div class="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-400">
+                            <h4 class="font-semibold text-orange-800 mb-2">Step 4: Priority 3 - Existing Tag Validation</h4>
+                            <div class="text-sm text-orange-700 space-y-1">
+                                <p><strong>Check:</strong> If transaction already has a tag, validate it against current rules</p>
+                                <p><strong>Investment Validation:</strong> If tag="Investments", run strict validation:</p>
+                                <ul class="ml-4 mt-1 space-y-1">
+                                    <li>• Must pass investment detection logic</li>
+                                    <li>• Category must be valid (investment, financial, etc.)</li>
+                                    <li>• Subcategory must be valid (stock purchase, etf, etc.)</li>
+                                    <li>• Must NOT contain excluded keywords (bunq, revolut, etc.)</li>
+                                </ul>
+                                <p><strong>Result:</strong> If validation fails, tag is invalidated and process continues</p>
+                            </div>
+                        </div>
+
+                        <!-- Step 5 -->
+                        <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
+                            <h4 class="font-semibold text-red-800 mb-2">Step 5: Priority 4 - Category Assignment</h4>
+                            <div class="text-sm text-red-700 space-y-1">
+                                <p><strong>Check:</strong> Apply hardcoded category rules based on description/keywords</p>
+                                <p><strong>Examples:</strong></p>
+                                <ul class="ml-4 mt-1 space-y-1">
+                                    <li>• "groceries" → category="groceries"</li>
+                                    <li>• "transport" → category="transport"</li>
+                                    <li>• "dining" → category="dining"</li>
+                                    <li>• "investment purchase" → category="investment"</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Step 6 -->
+                        <div class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-400">
+                            <h4 class="font-semibold text-indigo-800 mb-2">Step 6: Priority 5 - Tag Assignment</h4>
+                            <div class="text-sm text-indigo-700 space-y-1">
+                                <p><strong>Investment Detection:</strong> Check for investment indicators:</p>
+                                <ul class="ml-4 mt-1 space-y-1">
+                                    <li>• Keywords: "degiro", "flatex", "stock purchase", "etf"</li>
+                                    <li>• Account patterns: /degiro/i, /flatex/i</li>
+                                    <li>• Must be negative amount (outgoing)</li>
+                                    <li>• Must be above €10 threshold</li>
+                                    <li>• Must NOT contain fee/withdrawal keywords</li>
+                                </ul>
+                                <p><strong>Savings Detection:</strong> Check for savings indicators:</p>
+                                <ul class="ml-4 mt-1 space-y-1">
+                                    <li>• Keywords: "savings", "bunq", "emergency fund"</li>
+                                    <li>• Account patterns: /bunq/i, /savings account/i</li>
+                                </ul>
+                                <p><strong>Transfer Detection:</strong> Check for transfer indicators:</p>
+                                <ul class="ml-4 mt-1 space-y-1">
+                                    <li>• Keywords: "transfer", "between accounts"</li>
+                                    <li>• Account patterns: /internal transfer/i</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Step 7 -->
+                        <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-gray-400">
+                            <h4 class="font-semibold text-gray-800 mb-2">Step 7: Final Assignment & Confidence</h4>
+                            <div class="text-sm text-gray-700 space-y-1">
+                                <p><strong>Default:</strong> If no specific tag assigned → "Other"</p>
+                                <p><strong>Confidence Levels:</strong></p>
+                                <ul class="ml-4 mt-1 space-y-1">
+                                    <li>• Special Rules: 1.0 (100% confidence)</li>
+                                    <li>• User Mappings: 0.9 (90% confidence)</li>
+                                    <li>• Investment Detection: 0.8 (80% confidence)</li>
+                                    <li>• Savings/Transfer Detection: 0.7 (70% confidence)</li>
+                                    <li>• Default: 0.5 (50% confidence)</li>
+                                </ul>
+                                <p><strong>Metadata:</strong> Store classification reason and confidence for transparency</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">🔧 Management Tools</h3>
+                    <div class="space-y-3">
+                        <div class="bg-blue-50 p-3 rounded">
+                            <h4 class="font-medium text-blue-800">Manage Tag Mappings</h4>
+                            <p class="text-sm text-blue-700">Create custom category/subcategory → tag rules with visual interface</p>
+                        </div>
+                        <div class="bg-red-50 p-3 rounded">
+                            <h4 class="font-medium text-red-800">Fix All Existing Tags</h4>
+                            <p class="text-sm text-red-700">Re-evaluate all transactions using current rules and fix incorrect classifications</p>
+                        </div>
+                        <div class="bg-purple-50 p-3 rounded">
+                            <h4 class="font-medium text-purple-800">Extract & Merge All Rules</h4>
+                            <p class="text-sm text-purple-700">Combine hardcoded rules with custom mappings for comprehensive classification</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">💾 Data Portability</h3>
+                    <div class="space-y-3">
+                        <div class="bg-green-50 p-3 rounded">
+                            <h4 class="font-medium text-green-800">Export All Data</h4>
+                            <p class="text-sm text-green-700">Download complete localStorage backup including transactions, settings, and rules</p>
+                        </div>
+                        <div class="bg-blue-50 p-3 rounded">
+                            <h4 class="font-medium text-blue-800">Import All Data</h4>
+                            <p class="text-sm text-blue-700">Import complete state from backup file with preview and confirmation</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">📊 Advanced Features</h3>
+                    <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+                        <li><strong>Period Analysis:</strong> View transactions by month, quarter, year, or custom periods</li>
+                        <li><strong>Savings Dashboard:</strong> Dedicated view for savings and investment tracking</li>
+                        <li><strong>Transaction Filtering:</strong> Filter by income, expenses, savings, investments, or transfers</li>
+                        <li><strong>Column Management:</strong> Show/hide columns and save preferences</li>
+                        <li><strong>Manual Override:</strong> Manually tag individual transactions with override history</li>
+                        <li><strong>Learning System:</strong> Learn from manual assignments and apply learned rules</li>
+                        <li><strong>Statistics Export:</strong> Export period reports and transaction data</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">🔄 Duplicate Detection & Data Integrity</h3>
+                    <p class="text-sm text-gray-600 mb-3">Robust duplicate detection and data management:</p>
                     <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
                         <li>Uses transaction ID for JSON files</li>
                         <li>Creates fingerprints from date, amount, and description for CSV files</li>
                         <li>Duplicates are automatically filtered out during upload</li>
-                        <li>No duplicate transactions are stored in local storage</li>
+                        <li>JSON-first approach with CSV enrichment</li>
+                        <li>Automatic backup creation before major operations</li>
+                        <li>Data recovery tools for localStorage issues</li>
                     </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">📊 Features</h3>
+                    <h3 class="text-lg font-semibold mb-2">🎯 Smart Classification Examples</h3>
+                    <div class="space-y-2">
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Bunq transactions:</strong> Automatically classified as Savings (not Investments)</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Revolut transactions:</strong> Automatically classified as Transfers</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Credit card payments:</strong> Can be mapped to "Other" via custom rules</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Charity donations:</strong> Can be mapped to "Gift" via custom rules</div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">📈 Analytics & Reporting</h3>
                     <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                        <li>Automatic tag assignment based on category/subcategory</li>
-                        <li>Manual tag editing for individual transactions</li>
-                        <li>Column visibility controls</li>
-                        <li>Filtering by transaction type (income/expense)</li>
-                        <li>Export functionality for tagged data</li>
-                        <li>Statistics and category breakdown</li>
+                        <li>Real-time income/expense statistics</li>
+                        <li>Savings rate calculation</li>
+                        <li>Investment tracking and analysis</li>
+                        <li>Period-over-period comparisons</li>
+                        <li>Tag-based transaction grouping</li>
+                        <li>Export capabilities for external analysis</li>
                     </ul>
                 </div>
             </div>
