@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { getAllStandardColumns, DEFAULT_VISIBLE_COLUMNS } from '@/data/columnMapping';
 import { getTransactionStatistics } from '@/utils/transactionClassification';
 import { useTransactionLearning } from './useTransactionLearning';
+import { useTransactionEngine } from './useTransactionEngine';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -543,7 +544,7 @@ export function useTransactionStore() {
             let fixReason = '';
 
             // SPECIAL RULE: Revolut transactions should always be Transfers
-            if (description.includes('revolut**7355*')) {
+            if (description.includes('revolut')) {
                 newTag = 'Transfers';
                 fixReason = 'Special rule: Revolut transactions are always transfers';
                 if (oldTag === 'Investments') {
@@ -1422,6 +1423,34 @@ export function useTransactionStore() {
     // Initialize learning system
     initializeTransactionStore();
 
+    // Rule extraction and merging function
+    const extractAndMergeAllRules = () => {
+        console.log('🔧 Extracting and merging all rules from transaction store...');
+
+        try {
+            // Get the function from useTransactionEngine
+            const { extractAndMergeAllRules: engineExtractRules } = useTransactionEngine();
+
+            // Call the actual implementation
+            const result = engineExtractRules();
+
+            console.log('✅ Rules extracted and merged successfully');
+
+            // Show success message
+            return {
+                message: `Successfully extracted and merged ${Object.keys(result).length} rule categories`,
+                status: 'success',
+                result
+            };
+        } catch (error) {
+            console.error('❌ Error extracting and merging rules:', error);
+            return {
+                message: 'Error extracting and merging rules: ' + error.message,
+                status: 'error'
+            };
+        }
+    };
+
     return {
         // State
         transactions,
@@ -1490,6 +1519,9 @@ export function useTransactionStore() {
         exportLearnedRules,
         importLearnedRules,
         totalRules,
-        totalAssignments
+        totalAssignments,
+
+        // Rule extraction and merging
+        extractAndMergeAllRules
     };
 }

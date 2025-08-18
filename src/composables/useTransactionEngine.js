@@ -33,7 +33,19 @@ export function useTransactionEngine() {
     const { initializeLearning, learnFromAssignment, applyLearnedRules, getLearningStatistics, clearLearnedData, exportLearnedRules, importLearnedRules, totalRules, totalAssignments } = useTransactionLearning();
 
     // Initialize tag mapping system
-    const { getTagMapping } = useMultiFormatParser();
+    const { getTagMapping: getOriginalTagMapping } = useMultiFormatParser();
+
+    // Enhanced getTagMapping that includes both hardcoded and custom rules
+    const getTagMapping = () => {
+        // First try to get merged rules (if extractAndMergeAllRules was called)
+        const mergedRules = loadCustomTagMapping();
+        if (Object.keys(mergedRules).length > 0) {
+            return mergedRules;
+        }
+
+        // Fallback to original mapping
+        return getOriginalTagMapping();
+    };
 
     // State
     const transactions = ref([]);
@@ -1042,6 +1054,169 @@ export function useTransactionEngine() {
     initialize();
 
     // ============================================================================
+    // RULE EXTRACTION AND MERGING
+    // ============================================================================
+
+    /**
+     * Extract all hardcoded rules and merge with custom tag mappings
+     * This ensures all rules (hardcoded + user-defined) are properly applied
+     */
+    const extractAndMergeAllRules = () => {
+        console.log('🔧 Extracting and merging all rules...');
+
+        // Get existing custom mappings
+        const customMapping = loadCustomTagMapping();
+        console.log('📋 Existing custom mappings:', customMapping);
+
+        // Extract hardcoded rules from CATEGORY_RULES
+        const hardcodedRules = {};
+
+        CATEGORY_RULES.forEach((rule) => {
+            if (rule.category && rule.subcategory) {
+                const category = rule.category.toLowerCase();
+                const subcategory = rule.subcategory.toLowerCase();
+
+                if (!hardcodedRules[category]) {
+                    hardcodedRules[category] = {};
+                }
+
+                // Map category to appropriate tag based on the category name
+                let tag = 'Other';
+                if (category.includes('groceries') || category.includes('household')) {
+                    tag = 'Groceries';
+                } else if (category.includes('health') || category.includes('wellness') || category.includes('medical')) {
+                    tag = 'Health';
+                } else if (category.includes('restaurant') || category.includes('food')) {
+                    tag = 'Dining';
+                } else if (category.includes('bar') || category.includes('entertainment')) {
+                    tag = 'Entertainment';
+                } else if (category.includes('shopping')) {
+                    tag = 'Shopping';
+                } else if (category.includes('transport') || category.includes('travel')) {
+                    tag = 'Transport';
+                } else if (category.includes('free time') || category.includes('entertainment')) {
+                    tag = 'Entertainment';
+                } else if (category.includes('fixed') || category.includes('expenses')) {
+                    tag = 'Fixed Expenses';
+                } else if (category.includes('gift')) {
+                    tag = 'Gift';
+                }
+
+                hardcodedRules[category][subcategory] = tag;
+                console.log(`📋 Hardcoded rule: ${category}/${subcategory} → ${tag}`);
+            }
+        });
+
+        // Extract rules from TAG_RULES
+        Object.entries(TAG_RULES).forEach(([ruleType, rule]) => {
+            if (ruleType === 'savings') {
+                // Add savings keywords as rules
+                rule.keywords.forEach((keyword) => {
+                    if (!hardcodedRules['savings']) {
+                        hardcodedRules['savings'] = {};
+                    }
+                    hardcodedRules['savings'][keyword] = 'Savings';
+                });
+
+                // Add savings subcategories
+                rule.subcategories.forEach((subcategory) => {
+                    if (!hardcodedRules['savings']) {
+                        hardcodedRules['savings'] = {};
+                    }
+                    hardcodedRules['savings'][subcategory] = 'Savings';
+                });
+            } else if (ruleType === 'transfers') {
+                // Add transfer keywords as rules
+                rule.keywords.forEach((keyword) => {
+                    if (!hardcodedRules['transfers']) {
+                        hardcodedRules['transfers'] = {};
+                    }
+                    hardcodedRules['transfers'][keyword] = 'Transfers';
+                });
+
+                // Add transfer subcategories
+                rule.subcategories.forEach((subcategory) => {
+                    if (!hardcodedRules['transfers']) {
+                        hardcodedRules['transfers'] = {};
+                    }
+                    hardcodedRules['transfers'][subcategory] = 'Transfers';
+                });
+            } else if (ruleType === 'investments') {
+                // Add investment keywords as rules
+                rule.keywords.forEach((keyword) => {
+                    if (!hardcodedRules['investment']) {
+                        hardcodedRules['investment'] = {};
+                    }
+                    hardcodedRules['investment'][keyword] = 'Investments';
+                });
+
+                // Add investment subcategories
+                rule.subcategories.forEach((subcategory) => {
+                    if (!hardcodedRules['investment']) {
+                        hardcodedRules['investment'] = {};
+                    }
+                    hardcodedRules['investment'][subcategory] = 'Investments';
+                });
+            } else if (ruleType === 'income') {
+                // Add income keywords as rules
+                rule.keywords.forEach((keyword) => {
+                    if (!hardcodedRules['income']) {
+                        hardcodedRules['income'] = {};
+                    }
+                    hardcodedRules['income'][keyword] = 'Income';
+                });
+            }
+        });
+
+        console.log('📋 Extracted hardcoded rules:', hardcodedRules);
+
+        // Merge custom mappings with hardcoded rules
+        // Custom mappings take precedence over hardcoded rules
+        const mergedRules = { ...hardcodedRules, ...customMapping };
+
+        // For overlapping categories, merge subcategories
+        Object.keys(customMapping).forEach((category) => {
+            if (hardcodedRules[category]) {
+                mergedRules[category] = { ...hardcodedRules[category], ...customMapping[category] };
+            }
+        });
+
+        console.log('📋 Merged rules:', mergedRules);
+
+        // Save the merged rules back to localStorage
+        saveCustomTagMapping(mergedRules);
+
+        console.log('✅ All rules merged and saved to localStorage');
+
+        return mergedRules;
+    };
+
+    /**
+     * Load custom tag mapping from localStorage
+     */
+    const loadCustomTagMapping = () => {
+        try {
+            const saved = localStorage.getItem('customTagMapping');
+            return saved ? JSON.parse(saved) : {};
+        } catch (error) {
+            console.error('Error loading custom tag mapping:', error);
+            return {};
+        }
+    };
+
+    /**
+     * Save custom tag mapping to localStorage
+     */
+    const saveCustomTagMapping = (mapping) => {
+        try {
+            localStorage.setItem('customTagMapping', JSON.stringify(mapping));
+            console.log('💾 Custom tag mapping saved to localStorage');
+        } catch (error) {
+            console.error('Error saving custom tag mapping:', error);
+        }
+    };
+
+    // ============================================================================
     // PUBLIC API
     // ============================================================================
 
@@ -1089,6 +1264,11 @@ export function useTransactionEngine() {
         TAG_RULES,
 
         // Tag mapping system
-        getTagMapping
+        getTagMapping,
+
+        // New functions
+        extractAndMergeAllRules,
+        loadCustomTagMapping,
+        saveCustomTagMapping
     };
 }

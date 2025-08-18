@@ -63,7 +63,8 @@ const {
     getDetectionStatistics,
     manuallyOverrideTransaction,
     fixAllExistingTagAssignments,
-    getLearningStatistics
+    getLearningStatistics,
+    extractAndMergeAllRules
 } = useTransactionStore();
 
 // Local state
@@ -1416,6 +1417,7 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 <Button label="Reset Persistent Counts" icon="pi pi-refresh" @click="resetPersistentCounts" size="small" class="bg-red-500 hover:bg-red-600" />
                 <Button label="Auto-Detect Savings/Investments" icon="pi pi-search" @click="applySavingsInvestmentsDetection" size="small" class="bg-green-500 hover:bg-green-600" />
                 <Button label="Fix All Existing Tags" icon="pi pi-wrench" @click="fixAllExistingTags" size="small" class="bg-red-500 hover:bg-red-600" />
+                <Button label="Extract & Merge All Rules" icon="pi pi-sitemap" @click="extractAndMergeAllRules" size="small" class="bg-purple-500 hover:bg-purple-600" />
                 <Button label="Fix localStorage Data" icon="pi pi-database" @click="fixLocalStorageData" size="small" class="bg-orange-500 hover:bg-orange-600" />
                 <Button label="Recover from Backup" icon="pi pi-undo" @click="recoverFromBackup" size="small" class="bg-yellow-500 hover:bg-yellow-600" />
                 <Button label="Show Detection Stats" icon="pi pi-info-circle" @click="() => console.log('🔍 Detection Stats:', detectionStats)" size="small" class="bg-blue-500 hover:bg-blue-600" />
