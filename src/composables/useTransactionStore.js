@@ -775,17 +775,6 @@ export function useTransactionStore() {
         return false;
     }
 
-    function resetPersistentCounts() {
-        try {
-            localStorage.removeItem(PERSISTENT_STORAGE_KEYS.TOTAL_JSON_TRANSACTIONS);
-            localStorage.removeItem(PERSISTENT_STORAGE_KEYS.TOTAL_CSV_TRANSACTIONS);
-            localStorage.removeItem(PERSISTENT_STORAGE_KEYS.TOTAL_DATATABLE_TRANSACTIONS);
-            console.log('🔄 Reset all persistent transaction counts');
-        } catch (error) {
-            console.error('Error resetting persistent counts:', error);
-        }
-    }
-
     // Initialize learning system on startup
     function initializeTransactionStore() {
         initializeLearning();
@@ -1500,7 +1489,6 @@ export function useTransactionStore() {
 
         // Persistent tracking functions
         getPersistentCounts,
-        resetPersistentCounts,
 
         // Savings and investments detection
         detectSavingsAndInvestments,

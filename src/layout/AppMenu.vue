@@ -8,20 +8,19 @@ const model = ref([
         label: 'Home',
         items: [
             { label: 'Dashboard', icon: 'pi pi-fw pi-home', to: '/' },
-            { label: 'Financial Dashboard', icon: 'pi pi-fw pi-home', to: '/financial-dashboard' },
             { label: 'ChatGPT', icon: 'pi pi-fw pi-home', to: '/chat-gpt' },
-            { label: 'Demo Functionalities', icon: 'pi pi-fw pi-home', to: '/demo-functionalities' },
-            { label: 'Stocks Table', icon: 'pi pi-fw pi-home', to: '/stocks-table' },
+            { label: 'Drum Sequencer', icon: 'pi pi-fw pi-home', to: '/demo-functionalities' },
             { label: 'Transaction Analyzer', icon: 'pi pi-fw pi-chart-line', to: '/transaction-analyzer' },
             { label: 'Visuals Dashboard', icon: 'pi pi-fw pi-home', to: '/visuals-dashboard' },
             { label: 'Head 3D', icon: 'pi pi-fw pi-home', to: '/head-3d' },
+            { label: 'Health', icon: 'pi pi-fw pi-home', to: '/health-dashboard' },
             { label: 'Task Planner', icon: 'pi pi-fw pi-home', to: '/task-planner' },
             { label: 'Thought Tracker', icon: 'pi pi-fw pi-home', to: '/thought-tracker' },
             { label: 'Motivation', icon: 'pi pi-fw pi-home', to: '/' },
             // { label: 'Habits', icon: 'pi pi-fw pi-home', to: '/' },
             { label: 'Photo Uploader', icon: 'pi pi-fw pi-home', to: '/photo-uploader' },
-            { label: 'Health', icon: 'pi pi-fw pi-home', to: '/health-dashboard' },
-            { label: 'Journals', icon: 'pi pi-fw pi-home', to: '/journal-dashboard' }
+            { label: 'Journals', icon: 'pi pi-fw pi-home', to: '/journal-dashboard' },
+            { label: 'Stocks Table', icon: 'pi pi-fw pi-home', to: '/stocks-table' }
         ]
     },
     {
