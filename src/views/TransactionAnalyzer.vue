@@ -58,7 +58,6 @@ const {
     clearAllData,
     debugCheckDuplicates,
     getDetectionStatistics,
-    manuallyOverrideTransaction,
     fixAllExistingTagAssignments,
     extractAndMergeAllRules
 } = useTransactionStore();
@@ -1414,14 +1413,6 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                     @click="showSavingsDashboard = !showSavingsDashboard"
                     size="small"
                     class="bg-indigo-500 hover:bg-indigo-600"
-                />
-                <Button
-                    label="Manual Override Demo"
-                    icon="pi pi-edit"
-                    @click="() => manuallyOverrideTransaction(transactions[0]?.id, 'Savings', 'Demo override')"
-                    size="small"
-                    class="bg-orange-500 hover:bg-orange-600"
-                    :disabled="!transactions.length"
                 />
             </div>
         </div>

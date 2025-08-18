@@ -173,40 +173,6 @@ export function useTransactionStore() {
         return stats;
     }
 
-    // Function to manually override transaction categorization
-    function manuallyOverrideTransaction(transactionId, newTag, reason = 'Manual override') {
-        const transactionIndex = transactions.value.findIndex((t) => t.id === transactionId);
-        if (transactionIndex !== -1) {
-            const transaction = transactions.value[transactionIndex];
-            const oldTag = transaction.tag;
-            transaction.tag = newTag;
-
-            // Add override metadata
-            if (!transaction.overrideHistory) {
-                transaction.overrideHistory = [];
-            }
-            transaction.overrideHistory.push({
-                timestamp: new Date().toISOString(),
-                oldTag,
-                newTag,
-                reason
-            });
-
-            console.log(`🔄 Manual override: Transaction "${transaction.description}" changed from "${oldTag}" to "${newTag}" (${reason})`);
-
-            // Learn from this manual assignment
-            if (newTag && newTag !== oldTag) {
-                learnFromAssignment(transaction, newTag);
-            }
-
-            // Recalculate statistics
-            calculateStatistics();
-
-            return true;
-        }
-        return false;
-    }
-
     // Initialize learning system on startup
     function initializeTransactionStore() {
         initializeLearning();
@@ -914,9 +880,6 @@ export function useTransactionStore() {
 
         // Detection statistics
         getDetectionStatistics,
-
-        // Manual override
-        manuallyOverrideTransaction,
 
         // Comprehensive tag fixing
         fixAllExistingTagAssignments,
