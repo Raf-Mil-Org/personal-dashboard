@@ -144,10 +144,15 @@ export function useTransactionEngine() {
     // ============================================================================
 
     const TAG_RULES = {
+        // Special rules (highest priority)
+        special: [
+            // Add any special rules here if needed
+        ],
+
         // Savings rules
         savings: {
-            keywords: ['savings', 'emergency fund', 'bunq', 'deposit', 'save', 'goal savings', 'reserve', 'nest egg', 'rainy day fund'],
-            accountPatterns: [/bunq/i, /savings account/i, /emergency fund/i, /goal savings/i],
+            keywords: ['savings', 'bunq'],
+            accountPatterns: [/bunq/i, /savings account/i],
             subcategories: ['savings account', 'emergency fund', 'goal savings'],
             tag: 'Savings',
             confidence: 0.9,
@@ -156,7 +161,7 @@ export function useTransactionEngine() {
 
         // Transfer rules
         transfers: {
-            keywords: ['transfer', 'internal transfer', 'account transfer', 'between accounts', 'own transfer', 'self transfer', 'move money'],
+            keywords: ['transfer'],
             accountPatterns: [/transfer to own account/i, /internal transfer/i, /between own accounts/i],
             subcategories: ['internal transfer', 'account transfer', 'between accounts'],
             tag: 'Transfers',
@@ -166,25 +171,8 @@ export function useTransactionEngine() {
 
         // Investment rules (most restrictive)
         investments: {
-            keywords: [
-                'investment purchase',
-                'stock purchase',
-                'bond purchase',
-                'etf purchase',
-                'mutual fund purchase',
-                'portfolio purchase',
-                'securities purchase',
-                'trading purchase',
-                'brokerage purchase',
-                '401k contribution',
-                'ira contribution',
-                'roth contribution',
-                'index fund purchase',
-                'dividend reinvestment',
-                'buy',
-                'purchase'
-            ],
-            accountPatterns: [/degiro/i, /trading212/i, /etoro/i, /coinbase/i, /binance/i, /kraken/i, /interactive brokers/i, /fidelity/i, /vanguard/i, /schwab/i],
+            keywords: ['flatex', 'degiro'],
+            accountPatterns: [/degiro/i, /flatex/i],
             subcategories: ['investment', 'investment account', 'stock market', 'crypto', 'etf', 'mutual funds'],
             tag: 'Investments',
             confidence: 0.7,
@@ -277,13 +265,17 @@ export function useTransactionEngine() {
         // PRIORITY 3: Tag assignment based on comprehensive rules
         const tagResult = assignTag(transaction);
 
-        // Combine results
+        // Combine results and ensure proper 'Other' classification for unclear transactions
+        const finalTag = tagResult.tag || 'Other';
+        const finalCategory = categoryResult.category || 'Other';
+        const finalSubcategory = categoryResult.subcategory || 'other';
+
         return {
-            tag: tagResult.tag,
-            category: categoryResult.category || transaction.category,
-            subcategory: categoryResult.subcategory || transaction.subcategory,
-            confidence: Math.min(tagResult.confidence, categoryResult.confidence),
-            reason: tagResult.reason
+            tag: finalTag,
+            category: finalCategory,
+            subcategory: finalSubcategory,
+            confidence: Math.min(tagResult.confidence || 0.5, categoryResult.confidence || 0.5),
+            reason: tagResult.reason || 'No specific indicators detected - classified as Other'
         };
     };
 
@@ -303,10 +295,10 @@ export function useTransactionEngine() {
             }
         }
 
-        // Default category
+        // Default category - ensure proper 'Other' classification
         return {
             category: 'Other',
-            subcategory: 'Uncategorized',
+            subcategory: 'other',
             confidence: 0.5
         };
     };
@@ -333,7 +325,7 @@ export function useTransactionEngine() {
             };
         }
 
-        // Check investments (most restrictive)
+        // Check investments (most restrictive - only if very specific indicators are present)
         if (isInvestmentTransaction(transaction)) {
             return {
                 tag: TAG_RULES.investments.tag,
@@ -351,11 +343,11 @@ export function useTransactionEngine() {
             };
         }
 
-        // Default: Other
+        // Default: Other - for any transaction that doesn't clearly match specific categories
         return {
             tag: 'Other',
             confidence: 0.5,
-            reason: 'No specific indicators detected'
+            reason: 'No specific indicators detected - classified as Other'
         };
     };
 
@@ -458,20 +450,30 @@ export function useTransactionEngine() {
         // Check 7: Exclude Bunq transactions
         if (exclusions.bunqExclusion && description.includes('bunq')) return false;
 
-        // POSITIVE CHECKS (must pass at least one)
+        // POSITIVE CHECKS (must pass at least one AND be very specific)
 
-        // Check keywords
-        const hasKeyword = rules.keywords.some((keyword) => description.includes(keyword));
-        if (hasKeyword) return true;
+        // Check 1: Specific investment purchase keywords (most restrictive)
+        const hasSpecificInvestmentKeyword = rules.keywords.some((keyword) => description.includes(keyword));
+        if (hasSpecificInvestmentKeyword) return true;
 
-        // Check account patterns
-        const hasAccountPattern = rules.accountPatterns.some((pattern) => pattern.test(description));
-        if (hasAccountPattern) return true;
+        // Check 2: Investment account patterns with strict context validation
+        const hasInvestmentAccount = rules.accountPatterns.some((pattern) => pattern.test(description));
+        if (hasInvestmentAccount) {
+            // Only classify as investment if the transaction contains specific purchase keywords
+            const strictInvestmentKeywords = ['purchase', 'buy', 'investment purchase', 'stock purchase', 'etf purchase'];
+            const hasStrictInvestmentKeyword = strictInvestmentKeywords.some((keyword) => description.includes(keyword));
+            if (hasStrictInvestmentKeyword) {
+                return true;
+            }
+        }
 
-        // Check subcategories
-        const hasSubcategory = rules.subcategories.some((sub) => subcategory.includes(sub));
-        if (hasSubcategory) return true;
+        // Check 3: Very specific investment subcategories only
+        const validInvestmentSubcategories = ['investment purchase', 'stock purchase', 'etf purchase', 'bond purchase'];
+        if (validInvestmentSubcategories.includes(subcategory)) {
+            return true;
+        }
 
+        // If none of the positive checks pass, it's NOT an investment
         return false;
     };
 
@@ -596,27 +598,26 @@ export function useTransactionEngine() {
      */
     const applyTagsToTransactions = (transactionList) => {
         return transactionList.map((transaction) => {
-            const existingTag = transaction.tag;
             const classification = classifyTransaction(transaction);
-            const newTag = classification.tag;
 
-            // Always apply the new classification to ensure latest rules are followed
-            // This is especially important for special rules like Revolut transactions
-            const updatedTransaction = {
-                ...transaction,
-                tag: newTag,
-                category: classification.category || transaction.category,
-                subcategory: classification.subcategory || transaction.subcategory,
-                classificationConfidence: classification.confidence,
-                classificationReason: classification.reason
+            // Ensure every transaction has a proper classification
+            const finalClassification = {
+                tag: classification.tag || 'Other',
+                category: classification.category || 'Other',
+                subcategory: classification.subcategory || 'other',
+                confidence: classification.confidence || 0.5,
+                reason: classification.reason || 'No specific indicators detected - classified as Other'
             };
 
-            // Log if tag changed (for debugging)
-            if (existingTag && existingTag !== newTag) {
-                console.log(`🔄 Re-evaluated tag: "${transaction.description}" (${existingTag} → ${newTag})`);
+            // Log if a transaction is being classified as 'Other' for debugging
+            if (finalClassification.tag === 'Other') {
+                console.log(`🏷️ Transaction classified as Other: "${transaction.description}" - Reason: ${finalClassification.reason}`);
             }
 
-            return updatedTransaction;
+            return {
+                ...transaction,
+                ...finalClassification
+            };
         });
     };
 
