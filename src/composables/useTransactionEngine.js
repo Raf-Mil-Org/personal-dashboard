@@ -144,18 +144,6 @@ export function useTransactionEngine() {
     // ============================================================================
 
     const TAG_RULES = {
-        // Special rules (highest priority)
-        special: [
-            {
-                pattern: /revolut\*\*7355\*/i,
-                tag: 'Transfers',
-                category: 'Other',
-                subcategory: 'Transfers',
-                confidence: 1.0,
-                reason: 'Special rule: Revolut transactions'
-            }
-        ],
-
         // Savings rules
         savings: {
             keywords: ['savings', 'emergency fund', 'bunq', 'deposit', 'save', 'goal savings', 'reserve', 'nest egg', 'rainy day fund'],
