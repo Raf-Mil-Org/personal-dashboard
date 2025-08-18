@@ -399,56 +399,6 @@ export function useTransactionStore() {
         return false;
     }
 
-    // Function to apply automatic savings/investments detection to transactions
-    function applySavingsInvestmentsDetection() {
-        let updatedCount = 0;
-        let investmentsCount = 0;
-        let savingsCount = 0;
-        let transfersCount = 0;
-
-        console.log('🔍 Starting enhanced savings/investments detection...');
-
-        transactions.value.forEach((transaction) => {
-            // Skip transactions that have been manually overridden
-            if (transaction.overrideHistory && transaction.overrideHistory.length > 0) {
-                console.log(`⏭️ Skipping manually overridden transaction: "${transaction.description}"`);
-                return;
-            }
-
-            const detectedType = detectSavingsAndInvestments(transaction);
-            if (detectedType && (!transaction.tag || transaction.tag === 'Other')) {
-                const oldTag = transaction.tag || 'Untagged';
-                transaction.tag = detectedType;
-                updatedCount++;
-
-                // Track counts by type
-                if (detectedType === 'Investments') investmentsCount++;
-                else if (detectedType === 'Savings') savingsCount++;
-                else if (detectedType === 'Transfers') transfersCount++;
-
-                console.log(`🏷️ Auto-detected ${detectedType} for: "${transaction.description}" (was: ${oldTag})`);
-            }
-        });
-
-        if (updatedCount > 0) {
-            console.log(`✅ Enhanced detection complete:`);
-            console.log(`   📊 Total updated: ${updatedCount}`);
-            console.log(`   💰 Investments: ${investmentsCount}`);
-            console.log(`   🏦 Savings: ${savingsCount}`);
-            console.log(`   🔄 Transfers: ${transfersCount}`);
-            calculateStatistics(); // Recalculate statistics
-        } else {
-            console.log('ℹ️ No new transactions detected for auto-categorization');
-        }
-
-        return {
-            total: updatedCount,
-            investments: investmentsCount,
-            savings: savingsCount,
-            transfers: transfersCount
-        };
-    }
-
     // Function to comprehensively re-evaluate and fix ALL existing tag assignments
     function fixAllExistingTagAssignments() {
         console.log('🔧 Starting comprehensive re-evaluation of ALL existing tag assignments...');
@@ -1135,12 +1085,6 @@ export function useTransactionStore() {
         // Calculate statistics
         calculateStatistics();
 
-        // Auto-detect savings and investments for new transactions
-        if (newCount > 0) {
-            console.log('🔍 Auto-running savings/investments detection for new transactions...');
-            applySavingsInvestmentsDetection();
-        }
-
         // Log current persistent counts
         logPersistentCounts();
     }
@@ -1492,7 +1436,6 @@ export function useTransactionStore() {
 
         // Savings and investments detection
         detectSavingsAndInvestments,
-        applySavingsInvestmentsDetection,
         getDetectionStatistics,
 
         // Manual override

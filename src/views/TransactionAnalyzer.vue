@@ -58,7 +58,6 @@ const {
     clearAllData,
     debugCheckDuplicates,
     getPersistentCounts,
-    applySavingsInvestmentsDetection,
     getDetectionStatistics,
     manuallyOverrideTransaction,
     fixAllExistingTagAssignments,
@@ -1412,7 +1411,6 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
             <div class="mt-4 flex gap-3">
                 <Button label="Manage Tag Mappings" icon="pi pi-cog" @click="$router.push('/tag-mapping-manager')" size="small" class="bg-blue-500 hover:bg-blue-600" />
                 <Button label="View Documentation" icon="pi pi-info-circle" @click="showDocumentation = true" size="small" class="bg-gray-500 hover:bg-gray-600" />
-                <Button label="Auto-Detect Savings/Investments" icon="pi pi-search" @click="applySavingsInvestmentsDetection" size="small" class="bg-green-500 hover:bg-green-600" />
                 <Button label="Fix All Existing Tags" icon="pi pi-wrench" @click="fixAllExistingTags" size="small" class="bg-red-500 hover:bg-red-600" />
                 <Button label="Extract & Merge All Rules" icon="pi pi-sitemap" @click="extractAndMergeAllRules" size="small" class="bg-purple-500 hover:bg-purple-600" />
                 <Button label="Fix localStorage Data" icon="pi pi-database" @click="fixLocalStorageData" size="small" class="bg-orange-500 hover:bg-orange-600" />
@@ -2073,7 +2071,6 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 :total-investments="totalInvestments"
                 :net-amount="netAmount"
                 :savings-rate="savingsRate"
-                @auto-detect="applySavingsInvestmentsDetection"
                 @export-report="() => console.log('Export report clicked')"
                 @detailed-analysis="() => console.log('Detailed analysis clicked')"
             />
