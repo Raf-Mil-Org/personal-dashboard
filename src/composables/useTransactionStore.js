@@ -14,13 +14,6 @@ const STORAGE_KEYS = {
     LAST_UPLOAD: 'transaction_analyzer_last_upload'
 };
 
-// Persistent storage keys (never deleted)
-const PERSISTENT_STORAGE_KEYS = {
-    TOTAL_JSON_TRANSACTIONS: 'transaction_analyzer_persistent_total_json',
-    TOTAL_CSV_TRANSACTIONS: 'transaction_analyzer_persistent_total_csv',
-    TOTAL_DATATABLE_TRANSACTIONS: 'transaction_analyzer_persistent_total_datatable'
-};
-
 // Predefined tags
 const DEFAULT_TAGS = ['Groceries', 'Utilities', 'Dining', 'Transport', 'Health', 'Entertainment', 'Subscriptions', 'Housing', 'Savings', 'Investments', 'Transfers', 'Other'];
 
@@ -801,6 +794,246 @@ export function useTransactionStore() {
         }
     };
 
+    // Function to export all localStorage data
+    const exportAllLocalStorageData = () => {
+        console.log('📤 Exporting all localStorage data...');
+
+        try {
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                version: '1.0.0',
+                data: {}
+            };
+
+            // Export all known storage keys
+            const storageKeys = [
+                // Transaction data
+                'transactions',
+                'lastUploadInfo',
+
+                // Column preferences
+                'visibleColumns',
+                'columnPreferences',
+
+                // Tag data
+                'availableTags',
+                'customTags',
+                'customTagMapping',
+
+                // Learning data
+                'learnedRules',
+                'learningAssignments',
+
+                // Other settings
+                'selectedFilter',
+                'filterOptions',
+                'lastBackup'
+            ];
+
+            // Collect all data from localStorage
+            storageKeys.forEach((key) => {
+                try {
+                    const value = localStorage.getItem(key);
+                    if (value !== null) {
+                        exportData.data[key] = value;
+                        console.log(`📦 Exported: ${key}`);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Could not export ${key}:`, error);
+                }
+            });
+
+            // Also export any other keys that might exist
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && !storageKeys.includes(key)) {
+                    try {
+                        const value = localStorage.getItem(key);
+                        if (value !== null) {
+                            exportData.data[key] = value;
+                            console.log(`📦 Exported additional: ${key}`);
+                        }
+                    } catch (error) {
+                        console.warn(`⚠️ Could not export additional key ${key}:`, error);
+                    }
+                }
+            }
+
+            // Create downloadable file
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `personal-dashboard-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            console.log(`✅ Exported ${Object.keys(exportData.data).length} localStorage items`);
+
+            return {
+                success: true,
+                message: `Successfully exported ${Object.keys(exportData.data).length} localStorage items`,
+                count: Object.keys(exportData.data).length,
+                timestamp: exportData.timestamp
+            };
+        } catch (error) {
+            console.error('❌ Error exporting localStorage data:', error);
+            return {
+                success: false,
+                message: 'Error exporting localStorage data: ' + error.message
+            };
+        }
+    };
+
+    // Function to import all localStorage data
+    const importAllLocalStorageData = (file) => {
+        return new Promise((resolve, reject) => {
+            console.log('📥 Importing localStorage data...');
+
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                try {
+                    const importData = JSON.parse(event.target.result);
+
+                    // Validate the import data structure
+                    if (!importData.data || typeof importData.data !== 'object') {
+                        throw new Error('Invalid backup file format: missing data object');
+                    }
+
+                    if (!importData.timestamp) {
+                        throw new Error('Invalid backup file format: missing timestamp');
+                    }
+
+                    console.log(`📦 Importing backup from: ${importData.timestamp}`);
+                    console.log(`📦 Found ${Object.keys(importData.data).length} items to import`);
+
+                    let importedCount = 0;
+                    let skippedCount = 0;
+                    let errorCount = 0;
+
+                    // Import all data
+                    Object.entries(importData.data).forEach(([key, value]) => {
+                        try {
+                            // Validate that the value is a string (localStorage only stores strings)
+                            if (typeof value !== 'string') {
+                                console.warn(`⚠️ Skipping ${key}: value is not a string`);
+                                skippedCount++;
+                                return;
+                            }
+
+                            // Import the data
+                            localStorage.setItem(key, value);
+                            importedCount++;
+                            console.log(`✅ Imported: ${key}`);
+                        } catch (error) {
+                            console.error(`❌ Error importing ${key}:`, error);
+                            errorCount++;
+                        }
+                    });
+
+                    // Reload the application state from localStorage
+                    loadSavedTransactions();
+                    loadColumnPreferences();
+                    loadTags();
+                    loadCustomTags();
+
+                    console.log(`✅ Import complete: ${importedCount} imported, ${skippedCount} skipped, ${errorCount} errors`);
+
+                    resolve({
+                        success: true,
+                        message: `Successfully imported ${importedCount} localStorage items`,
+                        imported: importedCount,
+                        skipped: skippedCount,
+                        errors: errorCount,
+                        backupTimestamp: importData.timestamp
+                    });
+                } catch (error) {
+                    console.error('❌ Error parsing import file:', error);
+                    reject({
+                        success: false,
+                        message: 'Error parsing import file: ' + error.message
+                    });
+                }
+            };
+
+            reader.onerror = () => {
+                console.error('❌ Error reading import file');
+                reject({
+                    success: false,
+                    message: 'Error reading import file'
+                });
+            };
+
+            reader.readAsText(file);
+        });
+    };
+
+    // Function to preview import data without applying it
+    const previewImportData = (file) => {
+        return new Promise((resolve, reject) => {
+            console.log('👀 Previewing import data...');
+
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                try {
+                    const importData = JSON.parse(event.target.result);
+
+                    // Validate the import data structure
+                    if (!importData.data || typeof importData.data !== 'object') {
+                        throw new Error('Invalid backup file format: missing data object');
+                    }
+
+                    const preview = {
+                        timestamp: importData.timestamp,
+                        totalItems: Object.keys(importData.data).length,
+                        items: Object.keys(importData.data),
+                        summary: {}
+                    };
+
+                    // Categorize items
+                    Object.keys(importData.data).forEach((key) => {
+                        if (key.includes('transaction')) {
+                            preview.summary.transactions = (preview.summary.transactions || 0) + 1;
+                        } else if (key.includes('column') || key.includes('preference')) {
+                            preview.summary.preferences = (preview.summary.preferences || 0) + 1;
+                        } else if (key.includes('tag') || key.includes('mapping')) {
+                            preview.summary.tags = (preview.summary.tags || 0) + 1;
+                        } else if (key.includes('learn')) {
+                            preview.summary.learning = (preview.summary.learning || 0) + 1;
+                        } else {
+                            preview.summary.other = (preview.summary.other || 0) + 1;
+                        }
+                    });
+
+                    console.log('✅ Preview generated:', preview);
+                    resolve(preview);
+                } catch (error) {
+                    console.error('❌ Error previewing import file:', error);
+                    reject({
+                        success: false,
+                        message: 'Error previewing import file: ' + error.message
+                    });
+                }
+            };
+
+            reader.onerror = () => {
+                console.error('❌ Error reading preview file');
+                reject({
+                    success: false,
+                    message: 'Error reading preview file'
+                });
+            };
+
+            reader.readAsText(file);
+        });
+    };
+
     return {
         // State
         transactions,
@@ -860,6 +1093,11 @@ export function useTransactionStore() {
         totalAssignments,
 
         // Rule extraction and merging
-        extractAndMergeAllRules
+        extractAndMergeAllRules,
+
+        // Local Storage Export/Import
+        exportAllLocalStorageData,
+        importAllLocalStorageData,
+        previewImportData
     };
 }

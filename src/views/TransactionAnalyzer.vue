@@ -58,7 +58,10 @@ const {
     clearAllData,
     getDetectionStatistics,
     fixAllExistingTagAssignments,
-    extractAndMergeAllRules
+    extractAndMergeAllRules,
+    exportAllLocalStorageData,
+    importAllLocalStorageData,
+    previewImportData
 } = useTransactionStore();
 
 // Local state
@@ -210,6 +213,95 @@ const fixAllExistingTags = () => {
     });
 
     console.log('✅ Tag fixing complete:', result);
+};
+
+const exportAllData = () => {
+    console.log('📤 Exporting all localStorage data...');
+    const result = exportAllLocalStorageData();
+
+    if (result.success) {
+        toast.add({
+            severity: 'success',
+            summary: 'Export Complete',
+            detail: `Exported ${result.count} localStorage items`,
+            life: 5000
+        });
+    } else {
+        toast.add({
+            severity: 'error',
+            summary: 'Export Failed',
+            detail: result.message,
+            life: 5000
+        });
+    }
+};
+
+const importAllData = () => {
+    // Create a file input element
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+
+    fileInput.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            // First preview the data
+            const preview = await previewImportData(file);
+
+            // Show preview dialog
+            const confirmed = confirm(
+                `Import backup from ${preview.timestamp}?\n\n` +
+                    `This will import:\n` +
+                    `• ${preview.summary.transactions || 0} transaction items\n` +
+                    `• ${preview.summary.preferences || 0} preference items\n` +
+                    `• ${preview.summary.tags || 0} tag items\n` +
+                    `• ${preview.summary.learning || 0} learning items\n` +
+                    `• ${preview.summary.other || 0} other items\n\n` +
+                    `This will overwrite your current data. Continue?`
+            );
+
+            if (confirmed) {
+                const result = await importAllLocalStorageData(file);
+
+                if (result.success) {
+                    toast.add({
+                        severity: 'success',
+                        summary: 'Import Complete',
+                        detail: `Imported ${result.imported} items from backup`,
+                        life: 5000
+                    });
+
+                    // Refresh the page to ensure all data is loaded
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    toast.add({
+                        severity: 'error',
+                        summary: 'Import Failed',
+                        detail: result.message,
+                        life: 5000
+                    });
+                }
+            }
+        } catch (error) {
+            toast.add({
+                severity: 'error',
+                summary: 'Import Failed',
+                detail: error.message || 'Unknown error occurred',
+                life: 5000
+            });
+        }
+
+        // Clean up
+        document.body.removeChild(fileInput);
+    };
+
+    document.body.appendChild(fileInput);
+    fileInput.click();
 };
 
 const fixLocalStorageData = () => {
@@ -1404,6 +1496,8 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 <Button label="View Documentation" icon="pi pi-info-circle" @click="showDocumentation = true" size="small" class="bg-gray-500 hover:bg-gray-600" />
                 <Button label="Fix All Existing Tags" icon="pi pi-wrench" @click="fixAllExistingTags" size="small" class="bg-red-500 hover:bg-red-600" />
                 <Button label="Extract & Merge All Rules" icon="pi pi-sitemap" @click="extractAndMergeAllRules" size="small" class="bg-purple-500 hover:bg-purple-600" />
+                <Button label="Export All Data" icon="pi pi-download" @click="exportAllData" size="small" class="bg-green-500 hover:bg-green-600" />
+                <Button label="Import All Data" icon="pi pi-upload" @click="importAllData" size="small" class="bg-blue-500 hover:bg-blue-600" />
                 <Button label="Fix localStorage Data" icon="pi pi-database" @click="fixLocalStorageData" size="small" class="bg-orange-500 hover:bg-orange-600" />
                 <Button label="Recover from Backup" icon="pi pi-undo" @click="recoverFromBackup" size="small" class="bg-yellow-500 hover:bg-yellow-600" />
                 <Button
