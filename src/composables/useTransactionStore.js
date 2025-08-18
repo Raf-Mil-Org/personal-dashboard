@@ -504,9 +504,6 @@ export function useTransactionStore() {
 
         // Calculate statistics
         calculateStatistics();
-
-        // Log current persistent counts
-        // logPersistentCounts();
     }
 
     function loadSavedTransactions() {
