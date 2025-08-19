@@ -247,31 +247,33 @@ export function useTransactionEngine() {
     // ============================================================================
 
     /**
-     * Comprehensive transaction classification with ALL rules AND existing tag validation
+     * UNIFIED TRANSACTION CLASSIFICATION - Merged from determineTag() and classifyTransaction()
+     *
+     * Priority System:
+     * 1. Learned rules (with validation)
+     * 2. Category/subcategory → Tag mapping (user-defined)
+     * 3. Validate existing tag against current rules
+     * 4. Keyword-based tag assignment
+     * 5. Category assignment + default tag
+     *
+     * NO SPECIAL RULES - All classification based on consistent patterns
      */
     const classifyTransaction = (transaction) => {
         const description = (transaction.description || '').toLowerCase();
         const existingTag = (transaction.tag || '').toLowerCase();
+        const category = (transaction.category || '').toLowerCase();
+        const subcategory = (transaction.subcategory || '').toLowerCase();
+        const amount = parseInt(transaction.amount) || 0;
 
-        // PRIORITY 0: Special rules (highest priority)
-        for (const rule of TAG_RULES.special) {
-            if (rule.pattern.test(description)) {
-                return {
-                    tag: rule.tag,
-                    category: rule.category,
-                    subcategory: rule.subcategory,
-                    confidence: rule.confidence,
-                    reason: rule.reason
-                };
-            }
-        }
+        console.log('🔍 Unified classification for:', { description, existingTag, category, subcategory, amount });
 
-        // PRIORITY 1: Apply learned rules (but validate against current rules)
+        // PRIORITY 1: Apply learned rules (with validation)
         const learnedResult = applyLearnedRules(transaction);
         if (learnedResult && learnedResult.confidence > 0.6) {
             // Validate learned result against current rules
             const isValidLearnedTag = validateTagAgainstRules(transaction, learnedResult.tag);
             if (isValidLearnedTag) {
+                console.log(`✅ Learned rule applied: ${learnedResult.tag} (${learnedResult.confidence})`);
                 return {
                     tag: learnedResult.tag,
                     confidence: learnedResult.confidence,
@@ -282,52 +284,50 @@ export function useTransactionEngine() {
             }
         }
 
-        // PRIORITY 2: Check user-defined tag mappings (highest priority for user preferences)
-        const category = (transaction.category || '').toLowerCase();
-        const subcategory = (transaction.subcategory || '').toLowerCase();
+        // PRIORITY 2: Category/subcategory → Tag mapping (user-defined)
         const tagMapping = getTagMapping();
         if (category && subcategory && tagMapping[category] && tagMapping[category][subcategory]) {
             const mappedTag = tagMapping[category][subcategory];
-            console.log(`🏷️ User-defined mapping applied: ${category}/${subcategory} → ${mappedTag}`);
+            console.log(`🏷️ Category mapping applied: ${category}/${subcategory} → ${mappedTag}`);
             return {
                 tag: mappedTag,
                 confidence: 0.9,
-                reason: `User-defined mapping: ${category}/${subcategory} → ${mappedTag}`
+                reason: `Category mapping: ${category}/${subcategory} → ${mappedTag}`
             };
         }
 
-        // PRIORITY 3: Validate existing tag against current rules and category/subcategory
+        // PRIORITY 3: Validate existing tag against current rules
         if (existingTag && existingTag !== 'untagged' && existingTag !== 'other') {
             const isExistingTagValid = validateTagAgainstRules(transaction, existingTag);
             if (isExistingTagValid) {
-                // Existing tag is valid according to current rules
+                console.log(`✅ Existing tag validated: ${existingTag}`);
                 return {
                     tag: existingTag.charAt(0).toUpperCase() + existingTag.slice(1), // Capitalize
                     confidence: 0.8,
                     reason: `Validated existing tag: ${existingTag}`
                 };
             } else {
-                console.log(`⚠️ Invalidating existing tag for "${description}": ${existingTag} doesn't match current rules or category/subcategory`);
+                console.log(`⚠️ Invalidating existing tag for "${description}": ${existingTag} doesn't match current rules`);
             }
         }
 
-        // PRIORITY 4: Category assignment
+        // PRIORITY 4: Keyword-based tag assignment
+        const keywordResult = assignTagByKeywords(transaction);
+        if (keywordResult) {
+            console.log(`🏷️ Keyword-based tag assigned: ${keywordResult.tag} (${keywordResult.confidence})`);
+            return keywordResult;
+        }
+
+        // PRIORITY 5: Category assignment + default tag
         const categoryResult = assignCategory(transaction);
-
-        // PRIORITY 5: Tag assignment based on comprehensive rules
-        const tagResult = assignTag(transaction);
-
-        // Combine results and ensure proper 'Other' classification for unclear transactions
-        const finalTag = tagResult.tag || 'Other';
-        const finalCategory = categoryResult.category || 'Other';
-        const finalSubcategory = categoryResult.subcategory || 'other';
+        console.log(`🏷️ Default classification: Other (${categoryResult.confidence})`);
 
         return {
-            tag: finalTag,
-            category: finalCategory,
-            subcategory: finalSubcategory,
-            confidence: Math.min(tagResult.confidence || 0.5, categoryResult.confidence || 0.5),
-            reason: tagResult.reason || 'No specific indicators detected - classified as Other'
+            tag: 'Other',
+            category: categoryResult.category || 'Other',
+            subcategory: categoryResult.subcategory || 'other',
+            confidence: Math.min(categoryResult.confidence || 0.5, 0.5),
+            reason: 'No specific indicators detected - classified as Other'
         };
     };
 
@@ -361,31 +361,54 @@ export function useTransactionEngine() {
             }
 
             case 'investments': {
-                // CRITICAL: Strict validation for investments
-                // Must pass ALL investment checks AND have appropriate category/subcategory
-                if (!isInvestmentTransaction(transaction)) {
-                    return false;
+                // CRITICAL: Strict validation for investments using consolidated logic
+                const investmentKeywords = ['flatex', 'degiro', 'stock purchase', 'etf purchase', 'investment purchase'];
+                const investmentAccountPatterns = [/degiro/i, /flatex/i];
+                const investmentSubcategories = ['investment', 'investment account', 'stock market', 'crypto', 'etf', 'mutual funds'];
+
+                // FAIL-SAFE CHECKS (must pass ALL)
+                const exclusions = {
+                    positiveAmounts: true, // Only negative amounts can be investments
+                    minimumAmount: 10, // Minimum €10 for investments
+                    feeKeywords: ['fee', 'commission', 'charge', 'cost', 'expense', 'management fee', 'transaction fee'],
+                    withdrawalKeywords: ['withdrawal', 'withdraw', 'transfer out', 'sell', 'sale', 'redemption', 'cash out'],
+                    taxKeywords: ['tax', 'withholding', 'dividend tax', 'capital gains'],
+                    savingsKeywords: ['savings', 'emergency fund', 'bunq', 'deposit']
+                };
+
+                // Check 1: Only negative amounts can be investments
+                if (exclusions.positiveAmounts && amount >= 0) return false;
+
+                // Check 2: Minimum amount threshold
+                if (Math.abs(amount) / 100 < exclusions.minimumAmount) return false;
+
+                // Check 3: Exclude fees
+                const hasFeeKeyword = exclusions.feeKeywords.some((keyword) => description.includes(keyword));
+                if (hasFeeKeyword) return false;
+
+                // Check 4: Exclude withdrawals/sales
+                const hasWithdrawalKeyword = exclusions.withdrawalKeywords.some((keyword) => description.includes(keyword));
+                if (hasWithdrawalKeyword) return false;
+
+                // Check 5: Exclude taxes
+                const hasTaxKeyword = exclusions.taxKeywords.some((keyword) => description.includes(keyword));
+                if (hasTaxKeyword) return false;
+
+                // Check 6: Exclude savings
+                const hasSavingsExclusionKeyword = exclusions.savingsKeywords.some((keyword) => description.includes(keyword));
+                if (hasSavingsExclusionKeyword) return false;
+
+                // POSITIVE CHECKS (must pass at least one AND be very specific)
+                const hasInvestmentKeyword = investmentKeywords.some((keyword) => description.includes(keyword));
+                const hasInvestmentAccount = investmentAccountPatterns.some((pattern) => pattern.test(description));
+                const hasInvestmentSubcategory = investmentSubcategories.some((sub) => subcategory.includes(sub));
+                const isInvestmentCategory = category === 'investment' || category === 'investments' || category === 'financial';
+
+                if (hasInvestmentKeyword || (hasInvestmentAccount && hasInvestmentKeyword) || hasInvestmentSubcategory || isInvestmentCategory) {
+                    return true;
                 }
 
-                // Additional category/subcategory validation for investments
-                const validInvestmentCategories = ['investment', 'investments', 'financial'];
-                const validInvestmentSubcategories = ['investment', 'investment account', 'stock market', 'crypto', 'etf', 'mutual funds', 'investment purchase', 'stock purchase', 'etf purchase', 'bond purchase'];
-
-                const hasValidCategory = validInvestmentCategories.includes(category);
-                const hasValidSubcategory = validInvestmentSubcategories.includes(subcategory);
-
-                // If category/subcategory is explicitly set, it should match
-                if (category && category !== 'other' && !hasValidCategory) {
-                    console.log(`❌ Investment tag invalid: category "${category}" doesn't match investment criteria`);
-                    return false;
-                }
-
-                if (subcategory && subcategory !== 'other' && !hasValidSubcategory) {
-                    console.log(`❌ Investment tag invalid: subcategory "${subcategory}" doesn't match investment criteria`);
-                    return false;
-                }
-
-                return true;
+                return false;
             }
 
             case 'income': {
@@ -440,195 +463,159 @@ export function useTransactionEngine() {
     };
 
     /**
-     * Assign tag based on comprehensive rules
+     * Assign tag based on keyword patterns (consolidated from all detection functions)
      */
-    const assignTag = (transaction) => {
-        // Check savings
-        if (isSavingsTransaction(transaction)) {
-            return {
-                tag: TAG_RULES.savings.tag,
-                confidence: TAG_RULES.savings.confidence,
-                reason: TAG_RULES.savings.reason
-            };
-        }
-
-        // Check transfers
-        if (isTransferTransaction(transaction)) {
-            return {
-                tag: TAG_RULES.transfers.tag,
-                confidence: TAG_RULES.transfers.confidence,
-                reason: TAG_RULES.transfers.reason
-            };
-        }
-
-        // Check investments (most restrictive - only if very specific indicators are present)
-        if (isInvestmentTransaction(transaction)) {
-            return {
-                tag: TAG_RULES.investments.tag,
-                confidence: TAG_RULES.investments.confidence,
-                reason: TAG_RULES.investments.reason
-            };
-        }
-
-        // Check income
-        if (isIncomeTransaction(transaction)) {
-            return {
-                tag: TAG_RULES.income.tag,
-                confidence: TAG_RULES.income.confidence,
-                reason: TAG_RULES.income.reason
-            };
-        }
-
-        // Default: Other - for any transaction that doesn't clearly match specific categories
-        return {
-            tag: 'Other',
-            confidence: 0.5,
-            reason: 'No specific indicators detected - classified as Other'
-        };
-    };
-
-    // ============================================================================
-    // DETECTION FUNCTIONS
-    // ============================================================================
-
-    /**
-     * Check if transaction is a savings transaction
-     */
-    const isSavingsTransaction = (transaction) => {
+    const assignTagByKeywords = (transaction) => {
         const description = (transaction.description || '').toLowerCase();
         const category = (transaction.category || '').toLowerCase();
-        const subcategory = (transaction.subcategory || '').toLowerCase();
-
-        const rules = TAG_RULES.savings;
-
-        // Check keywords
-        const hasKeyword = rules.keywords.some((keyword) => description.includes(keyword));
-        if (hasKeyword) return true;
-
-        // Check account patterns
-        const hasAccountPattern = rules.accountPatterns.some((pattern) => pattern.test(description));
-        if (hasAccountPattern) return true;
-
-        // Check subcategories
-        const hasSubcategory = rules.subcategories.some((sub) => subcategory.includes(sub));
-        if (hasSubcategory) return true;
-
-        // Check category
-        const isSavingsCategory = category === 'savings' || subcategory === 'savings' || subcategory === 'savings account';
-        if (isSavingsCategory) return true;
-
-        return false;
-    };
-
-    /**
-     * Check if transaction is a transfer transaction
-     */
-    const isTransferTransaction = (transaction) => {
-        const description = (transaction.description || '').toLowerCase();
-        const category = (transaction.category || '').toLowerCase();
-        const subcategory = (transaction.subcategory || '').toLowerCase();
-
-        const rules = TAG_RULES.transfers;
-
-        // Check keywords
-        const hasKeyword = rules.keywords.some((keyword) => description.includes(keyword));
-        if (hasKeyword) return true;
-
-        // Check account patterns
-        const hasAccountPattern = rules.accountPatterns.some((pattern) => pattern.test(description));
-        if (hasAccountPattern) return true;
-
-        // Check subcategories
-        const hasSubcategory = rules.subcategories.some((sub) => subcategory.includes(sub));
-        if (hasSubcategory) return true;
-
-        // Check category
-        const isTransferCategory = category === 'transfers' || subcategory === 'transfers' || subcategory === 'internal transfer';
-        if (isTransferCategory) return true;
-
-        return false;
-    };
-
-    /**
-     * Check if transaction is an investment transaction (with comprehensive checks)
-     */
-    const isInvestmentTransaction = (transaction) => {
-        const description = (transaction.description || '').toLowerCase();
         const subcategory = (transaction.subcategory || '').toLowerCase();
         const amount = parseInt(transaction.amount) || 0;
-        const rules = TAG_RULES.investments;
-        const exclusions = rules.exclusions;
+
+        // SAVINGS DETECTION
+        const savingsKeywords = ['savings', 'emergency fund', 'bunq', 'deposit', 'save', 'goal savings'];
+        const savingsAccountPatterns = [/bunq/i, /savings account/i, /emergency fund/i, /goal savings/i];
+        const savingsSubcategories = ['savings account', 'emergency fund', 'goal savings'];
+
+        const hasSavingsKeyword = savingsKeywords.some((keyword) => description.includes(keyword));
+        const hasSavingsAccount = savingsAccountPatterns.some((pattern) => pattern.test(description));
+        const hasSavingsSubcategory = savingsSubcategories.some((sub) => subcategory.includes(sub));
+        const isSavingsCategory = category === 'savings' || subcategory === 'savings' || subcategory === 'savings account';
+
+        if (hasSavingsKeyword || hasSavingsAccount || hasSavingsSubcategory || isSavingsCategory) {
+            return {
+                tag: 'Savings',
+                confidence: 0.9,
+                reason: 'Savings indicators detected'
+            };
+        }
+
+        // TRANSFER DETECTION
+        const transferKeywords = ['transfer', 'internal transfer', 'account transfer', 'between accounts'];
+        const transferAccountPatterns = [/transfer to own account/i, /internal transfer/i, /between own accounts/i];
+        const transferSubcategories = ['internal transfer', 'account transfer', 'between accounts'];
+
+        const hasTransferKeyword = transferKeywords.some((keyword) => description.includes(keyword));
+        const hasTransferAccount = transferAccountPatterns.some((pattern) => pattern.test(description));
+        const hasTransferSubcategory = transferSubcategories.some((sub) => subcategory.includes(sub));
+        const isTransferCategory = category === 'transfers' || subcategory === 'transfers' || subcategory === 'internal transfer';
+
+        if (hasTransferKeyword || hasTransferAccount || hasTransferSubcategory || isTransferCategory) {
+            return {
+                tag: 'Transfers',
+                confidence: 0.8,
+                reason: 'Transfer indicators detected'
+            };
+        }
+
+        // INVESTMENT DETECTION (most restrictive)
+        const investmentKeywords = ['flatex', 'degiro', 'stock purchase', 'etf purchase', 'investment purchase'];
+        const investmentAccountPatterns = [/degiro/i, /flatex/i];
+        const investmentSubcategories = ['investment', 'investment account', 'stock market', 'crypto', 'etf', 'mutual funds'];
 
         // FAIL-SAFE CHECKS (must pass ALL)
+        const exclusions = {
+            positiveAmounts: true, // Only negative amounts can be investments
+            minimumAmount: 10, // Minimum €10 for investments
+            feeKeywords: [
+                'fee',
+                'commission',
+                'charge',
+                'cost',
+                'expense',
+                'management fee',
+                'transaction fee',
+                'custody fee',
+                'rebalancing fee',
+                'trading fee',
+                'brokerage fee',
+                'service charge',
+                'maintenance fee',
+                'account fee',
+                'monthly fee',
+                'annual fee',
+                'withdrawal fee',
+                'deposit fee',
+                'transfer fee',
+                'processing fee',
+                'handling fee',
+                'custody',
+                'administration',
+                'platform fee',
+                'exchange fee'
+            ],
+            withdrawalKeywords: ['withdrawal', 'withdraw', 'transfer out', 'sell', 'sale', 'redemption', 'cash out', 'disposal', 'liquidation', 'exit', 'close position'],
+            taxKeywords: ['tax', 'withholding', 'dividend tax', 'capital gains'],
+            savingsKeywords: ['savings', 'emergency fund', 'bunq', 'deposit']
+        };
 
         // Check 1: Only negative amounts can be investments
-        if (exclusions.positiveAmounts && amount >= 0) return false;
+        if (exclusions.positiveAmounts && amount >= 0) return null;
 
         // Check 2: Minimum amount threshold
-        if (Math.abs(amount) / 100 < exclusions.minimumAmount) return false;
+        if (Math.abs(amount) / 100 < exclusions.minimumAmount) return null;
 
         // Check 3: Exclude fees
         const hasFeeKeyword = exclusions.feeKeywords.some((keyword) => description.includes(keyword));
-        if (hasFeeKeyword) return false;
+        if (hasFeeKeyword) return null;
 
         // Check 4: Exclude withdrawals/sales
         const hasWithdrawalKeyword = exclusions.withdrawalKeywords.some((keyword) => description.includes(keyword));
-        if (hasWithdrawalKeyword) return false;
+        if (hasWithdrawalKeyword) return null;
 
         // Check 5: Exclude taxes
         const hasTaxKeyword = exclusions.taxKeywords.some((keyword) => description.includes(keyword));
-        if (hasTaxKeyword) return false;
+        if (hasTaxKeyword) return null;
 
         // Check 6: Exclude savings
-        const hasSavingsKeyword = exclusions.savingsKeywords.some((keyword) => description.includes(keyword));
-        if (hasSavingsKeyword) return false;
-
-        // Check 7: Exclude Bunq transactions
-        if (exclusions.bunqExclusion && description.includes('bunq')) return false;
+        const hasSavingsExclusionKeyword = exclusions.savingsKeywords.some((keyword) => description.includes(keyword));
+        if (hasSavingsExclusionKeyword) return null;
 
         // POSITIVE CHECKS (must pass at least one AND be very specific)
+        const hasInvestmentKeyword = investmentKeywords.some((keyword) => description.includes(keyword));
+        const hasInvestmentAccount = investmentAccountPatterns.some((pattern) => pattern.test(description));
+        const hasInvestmentSubcategory = investmentSubcategories.some((sub) => subcategory.includes(sub));
+        const isInvestmentCategory = category === 'investment' || category === 'investments' || category === 'financial';
 
-        // Check 1: Specific investment purchase keywords (most restrictive)
-        const hasSpecificInvestmentKeyword = rules.keywords.some((keyword) => description.includes(keyword));
-        if (hasSpecificInvestmentKeyword) return true;
-
-        // Check 2: Investment account patterns with strict context validation
-        const hasInvestmentAccount = rules.accountPatterns.some((pattern) => pattern.test(description));
-        if (hasInvestmentAccount) {
-            // Only classify as investment if the transaction contains specific purchase keywords
-            const strictInvestmentKeywords = ['purchase', 'buy', 'investment purchase', 'stock purchase', 'etf purchase'];
-            const hasStrictInvestmentKeyword = strictInvestmentKeywords.some((keyword) => description.includes(keyword));
-            if (hasStrictInvestmentKeyword) {
-                return true;
-            }
+        if (hasInvestmentKeyword || (hasInvestmentAccount && hasInvestmentKeyword) || hasInvestmentSubcategory || isInvestmentCategory) {
+            return {
+                tag: 'Investments',
+                confidence: 0.7,
+                reason: 'Investment indicators detected'
+            };
         }
 
-        // Check 3: Very specific investment subcategories only
-        const validInvestmentSubcategories = ['investment purchase', 'stock purchase', 'etf purchase', 'bond purchase'];
-        if (validInvestmentSubcategories.includes(subcategory)) {
-            return true;
+        // INCOME DETECTION
+        const incomeKeywords = ['salary', 'wage', 'income', 'payment', 'refund', 'dividend', 'bonus', 'commission', 'revenue'];
+        const hasIncomeKeyword = incomeKeywords.some((keyword) => description.includes(keyword));
+        const isPositiveAmount = amount > 0;
+
+        if (hasIncomeKeyword && isPositiveAmount) {
+            return {
+                tag: 'Income',
+                confidence: 0.8,
+                reason: 'Income indicators detected'
+            };
         }
 
-        // If none of the positive checks pass, it's NOT an investment
-        return false;
+        // GIFT DETECTION
+        const giftKeywords = ['gift', 'present', 'donation', 'charity'];
+        const hasGiftKeyword = giftKeywords.some((keyword) => description.includes(keyword));
+        const isGiftCategory = category === 'gift' || subcategory === 'charity' || subcategory === 'donation';
+
+        if (hasGiftKeyword || isGiftCategory) {
+            return {
+                tag: 'Gift',
+                confidence: 0.8,
+                reason: 'Gift indicators detected'
+            };
+        }
+
+        return null; // No keyword-based tag assigned
     };
 
-    /**
-     * Check if transaction is an income transaction
-     */
-    const isIncomeTransaction = (transaction) => {
-        const description = (transaction.description || '').toLowerCase();
-        const amount = parseInt(transaction.amount) || 0;
-
-        const rules = TAG_RULES.income;
-
-        // Income is typically positive
-        if (rules.requirePositiveAmount && amount <= 0) return false;
-
-        // Check keywords
-        const hasKeyword = rules.keywords.some((keyword) => description.includes(keyword));
-        return hasKeyword;
-    };
+    // ============================================================================
+    // DETECTION FUNCTIONS - REMOVED (consolidated into assignTagByKeywords)
+    // ============================================================================
 
     // ============================================================================
     // FILE PARSING SECTION

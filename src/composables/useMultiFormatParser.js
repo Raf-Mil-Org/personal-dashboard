@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { useCSVParser } from './useCSVParser';
+import { useTransactionEngine } from './useTransactionEngine';
 import { mapCSVToStandard, mapJSONToStandard, detectCategoryFromDescription } from '@/data/columnMapping';
 
 export function useMultiFormatParser() {
@@ -185,101 +186,25 @@ export function useMultiFormatParser() {
         saveCustomTagMapping(customMapping);
     };
 
-    // Validate if an existing tag should be trusted
-    const validateExistingTag = (existingTag, description) => {
-        const tag = existingTag.toLowerCase();
-        const desc = (description || '').toLowerCase();
-
-        // CRITICAL FIXES: Don't trust obviously wrong tags
-        if (tag === 'investments') {
-            // Don't trust investment tags for savings-related transactions
-            if (desc.includes('bunq') || desc.includes('savings') || desc.includes('emergency fund') || desc.includes('deposit')) {
-                return false;
-            }
-            // Don't trust investment tags for small amounts or fees
-            if (desc.includes('fee') || desc.includes('commission') || desc.includes('charge')) {
-                return false;
-            }
-            // Don't trust investment tags for withdrawals/sales
-            if (desc.includes('withdrawal') || desc.includes('withdraw') || desc.includes('sell') || desc.includes('sale')) {
-                return false;
-            }
-        }
-
-        if (tag === 'savings') {
-            // Don't trust savings tags for investment purchases
-            if (desc.includes('stock purchase') || desc.includes('etf purchase') || desc.includes('investment purchase')) {
-                return false;
-            }
-        }
-
-        if (tag === 'transfers') {
-            // Don't trust transfer tags for actual purchases
-            if (desc.includes('purchase') || desc.includes('buy') || desc.includes('payment')) {
-                return false;
-            }
-        }
-
-        // Trust tags that have clear indicators
-        if (tag === 'savings' && (desc.includes('savings') || desc.includes('bunq') || desc.includes('emergency fund'))) {
-            return true;
-        }
-
-        if (tag === 'transfers' && (desc.includes('transfer') || desc.includes('between accounts'))) {
-            return true;
-        }
-
-        if (tag === 'investments' && (desc.includes('stock purchase') || desc.includes('etf purchase') || desc.includes('investment purchase'))) {
-            return true;
-        }
-
-        // For other cases, be more conservative - only trust if there are clear indicators
-        return false;
-    };
+    // Validate if an existing tag should be trusted - REMOVED (now handled by unified classification)
 
     // Determine tag based on category and subcategory with proper priority
     const determineTag = (category, subcategory, existingTag = null, description = '') => {
         console.log('🔍 Determining tag for:', { category, subcategory, existingTag, description });
 
-        // SPECIAL RULE: Revolut transactions should always be Transfers
-        if (description && description.includes('revolut**7355*')) {
-            console.log('✅ Special rule: Revolut transaction classified as Transfers');
-            return 'Transfers';
-        }
+        // Create a transaction object for unified classification
+        const transaction = {
+            category,
+            subcategory,
+            tag: existingTag,
+            description
+        };
 
-        // Priority 1: Re-evaluate existing tags to catch incorrect assignments
-        if (existingTag && existingTag.trim()) {
-            const shouldTrustExistingTag = validateExistingTag(existingTag, description);
-            if (shouldTrustExistingTag) {
-                console.log('✅ Using trustworthy existing tag:', existingTag.trim());
-                return existingTag.trim();
-            } else {
-                console.log(`🔍 Re-evaluating untrustworthy existing tag: "${existingTag}" for "${description}"`);
-                // Continue to other priorities instead of blindly trusting existing tag
-            }
-        }
+        // Use the unified classification system from useTransactionEngine
+        const { classifyTransaction } = useTransactionEngine();
+        const classification = classifyTransaction(transaction);
 
-        // Priority 2: Try to map from category/subcategory combination
-        const tagMapping = getTagMapping();
-
-        if (category && subcategory && tagMapping[category] && tagMapping[category][subcategory]) {
-            const mappedTag = tagMapping[category][subcategory];
-            console.log('🏷️ Mapped tag from category/subcategory:', mappedTag);
-            return mappedTag;
-        }
-
-        // Priority 3: Try to map from just category (use first available subcategory)
-        if (category && tagMapping[category]) {
-            const firstSubcategory = Object.keys(tagMapping[category])[0];
-            if (firstSubcategory) {
-                const mappedTag = tagMapping[category][firstSubcategory];
-                console.log('🏷️ Mapped tag from category only:', mappedTag);
-                return mappedTag;
-            }
-        }
-
-        console.log('❌ No tag mapping found');
-        return null;
+        return classification.tag;
     };
 
     // Parse JSON transaction format

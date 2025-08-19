@@ -158,6 +158,11 @@ export function useTransactionLearning() {
         // Analyze patterns and create/update rules
         analyzeAndCreateRules();
 
+        // Also update category mappings if category/subcategory is available
+        if (transaction.category && transaction.subcategory) {
+            updateCategoryMapping(transaction.category, transaction.subcategory, assignedTag);
+        }
+
         return assignment;
     };
 
@@ -482,6 +487,31 @@ export function useTransactionLearning() {
 
     const totalRules = computed(() => learnedRules.value.length);
     const totalAssignments = computed(() => manualAssignments.value.length);
+
+    // Update category mappings when learning from assignments
+    const updateCategoryMapping = (category, subcategory, tag) => {
+        try {
+            console.log(`🔄 Updating category mapping: ${category}/${subcategory} → ${tag}`);
+
+            // Load existing custom tag mappings
+            const customMapping = JSON.parse(localStorage.getItem('customTagMapping') || '{}');
+
+            // Ensure category exists
+            if (!customMapping[category]) {
+                customMapping[category] = {};
+            }
+
+            // Update the mapping
+            customMapping[category][subcategory] = tag;
+
+            // Save back to localStorage
+            localStorage.setItem('customTagMapping', JSON.stringify(customMapping));
+
+            console.log(`✅ Category mapping updated: ${category}/${subcategory} → ${tag}`);
+        } catch (error) {
+            console.error('❌ Error updating category mapping:', error);
+        }
+    };
 
     return {
         // State

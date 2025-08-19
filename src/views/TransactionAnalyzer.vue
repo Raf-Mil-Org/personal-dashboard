@@ -156,6 +156,45 @@ const onFileSelect = async (event) => {
         // Save upload info
         saveLastUploadInfo(file.name, processedTransactionsWithTags.length);
 
+        // Apply comprehensive classification after file upload
+        if (hasJsonUploaded.value && hasCsvUploaded.value) {
+            console.log('🔄 Both files uploaded - applying comprehensive classification...');
+            const result = fixAllExistingTagAssignments();
+            console.log('✅ Comprehensive classification applied:', result);
+
+            // Show success message for comprehensive classification
+            toast.add({
+                severity: 'success',
+                summary: 'Classification Complete',
+                detail: `Applied comprehensive classification to ${result.total} transactions (${result.fixed} updated)`,
+                life: 5000
+            });
+        } else if (file.name.toLowerCase().endsWith('.json') && !hasCsvUploaded.value) {
+            // Only JSON uploaded - apply comprehensive classification
+            console.log('🔄 JSON file uploaded - applying comprehensive classification...');
+            const result = fixAllExistingTagAssignments();
+            console.log('✅ Comprehensive classification applied to JSON:', result);
+
+            toast.add({
+                severity: 'success',
+                summary: 'Classification Complete',
+                detail: `Applied comprehensive classification to ${result.total} JSON transactions (${result.fixed} updated)`,
+                life: 5000
+            });
+        } else if (file.name.toLowerCase().endsWith('.csv') && !hasJsonUploaded.value) {
+            // Only CSV uploaded - apply comprehensive classification
+            console.log('🔄 CSV file uploaded - applying comprehensive classification...');
+            const result = fixAllExistingTagAssignments();
+            console.log('✅ Comprehensive classification applied to CSV:', result);
+
+            toast.add({
+                severity: 'success',
+                summary: 'Classification Complete',
+                detail: `Applied comprehensive classification to ${result.total} CSV transactions (${result.fixed} updated)`,
+                life: 5000
+            });
+        }
+
         // Debug: Log the state after setting transactions
         console.log('Available columns:', availableColumns.value);
         console.log('Visible columns:', visibleColumns.value);
@@ -2219,17 +2258,17 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
 
                         <!-- Step 2 -->
                         <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
-                            <h4 class="font-semibold text-green-800 mb-2">Step 2: Priority 1 - Special Rules (Highest Priority)</h4>
+                            <h4 class="font-semibold text-green-800 mb-2">Step 2: Priority 1 - Learned Rules (Highest Priority)</h4>
                             <div class="text-sm text-green-700 space-y-1">
-                                <p><strong>Revolut Rule:</strong> If description contains "revolut" → Tag as "Transfers"</p>
-                                <p><strong>Bunq Rule:</strong> If description contains "bunq" → Tag as "Savings" (prevents Investment misclassification)</p>
-                                <p><strong>Result:</strong> If any special rule matches, classification stops here</p>
+                                <p><strong>Learning System:</strong> Apply rules learned from manual tag assignments</p>
+                                <p><strong>Validation:</strong> Learned rules are validated against current classification logic</p>
+                                <p><strong>Result:</strong> If valid learned rule matches, apply with confidence and stop</p>
                             </div>
                         </div>
 
                         <!-- Step 3 -->
                         <div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-400">
-                            <h4 class="font-semibold text-purple-800 mb-2">Step 3: Priority 2 - User-Defined Tag Mappings</h4>
+                            <h4 class="font-semibold text-purple-800 mb-2">Step 3: Priority 2 - Category/Subcategory → Tag Mappings</h4>
                             <div class="text-sm text-purple-700 space-y-1">
                                 <p><strong>Check:</strong> Look for custom mapping: category + subcategory → tag</p>
                                 <p><strong>Example:</strong> category="other", subcategory="credit card" → tag="Other"</p>
@@ -2256,7 +2295,7 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
 
                         <!-- Step 5 -->
                         <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
-                            <h4 class="font-semibold text-red-800 mb-2">Step 5: Priority 4 - Category Assignment</h4>
+                            <h4 class="font-semibold text-red-800 mb-2">Step 5: Priority 4 - Keyword-Based Tag Assignment</h4>
                             <div class="text-sm text-red-700 space-y-1">
                                 <p><strong>Check:</strong> Apply hardcoded category rules based on description/keywords</p>
                                 <p><strong>Examples:</strong></p>
@@ -2271,7 +2310,7 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
 
                         <!-- Step 6 -->
                         <div class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-400">
-                            <h4 class="font-semibold text-indigo-800 mb-2">Step 6: Priority 5 - Tag Assignment</h4>
+                            <h4 class="font-semibold text-indigo-800 mb-2">Step 6: Priority 5 - Category Assignment & Default Tag</h4>
                             <div class="text-sm text-indigo-700 space-y-1">
                                 <p><strong>Investment Detection:</strong> Check for investment indicators:</p>
                                 <ul class="ml-4 mt-1 space-y-1">
@@ -2296,7 +2335,7 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
 
                         <!-- Step 7 -->
                         <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-gray-400">
-                            <h4 class="font-semibold text-gray-800 mb-2">Step 7: Final Assignment & Confidence</h4>
+                            <h4 class="font-semibold text-gray-800 mb-2">Step 7: Final Assignment & Auto-Classification</h4>
                             <div class="text-sm text-gray-700 space-y-1">
                                 <p><strong>Default:</strong> If no specific tag assigned → "Other"</p>
                                 <p><strong>Confidence Levels:</strong></p>
@@ -2308,6 +2347,7 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                                     <li>• Default: 0.5 (50% confidence)</li>
                                 </ul>
                                 <p><strong>Metadata:</strong> Store classification reason and confidence for transparency</p>
+                                <p><strong>Auto-Classification:</strong> After file upload, comprehensive classification is automatically applied to all transactions</p>
                             </div>
                         </div>
                     </div>
@@ -2327,6 +2367,10 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                         <div class="bg-purple-50 p-3 rounded">
                             <h4 class="font-medium text-purple-800">Extract & Merge All Rules</h4>
                             <p class="text-sm text-purple-700">Combine hardcoded rules with custom mappings for comprehensive classification</p>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded">
+                            <h4 class="font-medium text-green-800">Auto-Classification</h4>
+                            <p class="text-sm text-green-700">Comprehensive classification automatically applied after file upload</p>
                         </div>
                     </div>
                 </div>
