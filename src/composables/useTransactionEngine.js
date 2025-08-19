@@ -198,33 +198,7 @@ export function useTransactionEngine() {
             exclusions: {
                 positiveAmounts: true, // Only negative amounts can be investments
                 minimumAmount: 10, // Minimum €10 for investments
-                feeKeywords: [
-                    'fee',
-                    'commission',
-                    'charge',
-                    'cost',
-                    'expense',
-                    'management fee',
-                    'transaction fee',
-                    'custody fee',
-                    'rebalancing fee',
-                    'trading fee',
-                    'brokerage fee',
-                    'service charge',
-                    'maintenance fee',
-                    'account fee',
-                    'monthly fee',
-                    'annual fee',
-                    'withdrawal fee',
-                    'deposit fee',
-                    'transfer fee',
-                    'processing fee',
-                    'handling fee',
-                    'custody',
-                    'administration',
-                    'platform fee',
-                    'exchange fee'
-                ],
+                feeKeywords: ['fee'],
                 withdrawalKeywords: ['withdrawal', 'withdraw', 'transfer out', 'sell', 'sale', 'redemption', 'cash out', 'disposal', 'liquidation', 'exit', 'close position'],
                 taxKeywords: ['tax', 'withholding', 'dividend tax', 'capital gains'],
                 savingsKeywords: ['savings', 'emergency fund', 'bunq', 'deposit'],
@@ -234,7 +208,7 @@ export function useTransactionEngine() {
 
         // Income rules
         income: {
-            keywords: ['salary', 'wage', 'income', 'payment', 'refund', 'dividend', 'bonus', 'commission', 'revenue'],
+            keywords: ['salary', 'abn amro bank', 'wage', 'income', 'payment', 'refund'],
             tag: 'Income',
             confidence: 0.8,
             reason: 'Income indicators detected',
@@ -413,7 +387,7 @@ export function useTransactionEngine() {
 
             case 'income': {
                 // Validate income tag
-                const incomeKeywords = ['salary', 'wage', 'income', 'payment', 'refund', 'dividend', 'bonus', 'commission', 'revenue'];
+                const incomeKeywords = ['salary', 'wage', 'income', 'payment', 'dividend', 'bonus', 'commission', 'revenue'];
                 const hasIncomeKeyword = incomeKeywords.some((keyword) => description.includes(keyword));
                 const isPositiveAmount = amount > 0;
                 return hasIncomeKeyword && isPositiveAmount;
@@ -425,6 +399,14 @@ export function useTransactionEngine() {
                 const hasGiftKeyword = giftKeywords.some((keyword) => description.includes(keyword));
                 const isGiftCategory = category === 'gift' || subcategory === 'charity' || subcategory === 'donation';
                 return hasGiftKeyword || isGiftCategory;
+            }
+
+            case 'returns': {
+                // Validate returns tag
+                const returnKeywords = ['returns'];
+                const hasReturnKeyword = returnKeywords.some((keyword) => description.includes(keyword));
+                const isReturnCategory = category === 'returns' || subcategory === 'Payment requests';
+                return hasReturnKeyword || isReturnCategory;
             }
 
             case 'other':
