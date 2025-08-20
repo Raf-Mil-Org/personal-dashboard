@@ -30,7 +30,7 @@ const STORAGE_KEYS = {
 
 export function useTransactionEngine() {
     // Initialize learning system
-    const { initializeLearning, learnFromAssignment, applyLearnedRules, clearLearnedData, exportLearnedRules, importLearnedRules, totalRules, totalAssignments } = useTransactionLearning();
+    const { initializeLearning, applyLearnedRules, clearLearnedData, exportLearnedRules, importLearnedRules, totalRules, totalAssignments } = useTransactionLearning();
 
     // Initialize tag mapping system
     const { getTagMapping: getOriginalTagMapping } = useMultiFormatParser();
