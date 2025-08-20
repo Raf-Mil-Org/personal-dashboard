@@ -2229,148 +2229,124 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">🏷️ Comprehensive Tag Classification System</h3>
-                    <p class="text-sm text-gray-600 mb-3">Advanced transaction classification with multiple rule types and priorities:</p>
+                    <h3 class="text-lg font-semibold mb-2">🏷️ Unified Rule Classification System</h3>
+                    <p class="text-sm text-gray-600 mb-3">Advanced transaction classification with a unified rule system and 5-tier priority structure:</p>
                     <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                        <li><strong>Priority 1:</strong> Special rules (e.g., Revolut transactions → Transfers)</li>
-                        <li><strong>Priority 2:</strong> User-defined tag mappings (highest priority)</li>
-                        <li><strong>Priority 3:</strong> Existing tag validation against current rules</li>
-                        <li><strong>Priority 4:</strong> Category assignment based on hardcoded rules</li>
-                        <li><strong>Priority 5:</strong> Tag assignment based on hardcoded rules</li>
-                        <li><strong>Enhanced Validation:</strong> Strict checks for investment tags with category/subcategory validation</li>
+                        <li><strong>Tier 1 (Highest):</strong> User-defined mappings and critical rules</li>
+                        <li><strong>Tier 2:</strong> Learned rules from manual assignments</li>
+                        <li><strong>Tier 3:</strong> System rules and general patterns</li>
+                        <li><strong>Tier 4:</strong> Fallback rules and default assignments</li>
+                        <li><strong>Tier 5 (Lowest):</strong> Default fallback classification</li>
+                        <li><strong>Rule Types:</strong> Category Mapping, Keyword Mapping, Category-Keyword Mapping, Category Assignment, Exclusion Rules</li>
+                        <li><strong>Enhanced Validation:</strong> Comprehensive data validation and integrity checks</li>
                     </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">🔄 Step-by-Step Classification Process</h3>
-                    <p class="text-sm text-gray-600 mb-3">Here's exactly how the system processes each transaction:</p>
+                    <h3 class="text-lg font-semibold mb-2">🔄 Enhanced Classification Process with Error Handling</h3>
+                    <p class="text-sm text-gray-600 mb-3">Here's exactly how the system processes each transaction with comprehensive error handling and validation:</p>
 
                     <div class="space-y-4">
                         <!-- Step 1 -->
                         <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
-                            <h4 class="font-semibold text-blue-800 mb-2">Step 1: Transaction Input & Preprocessing</h4>
+                            <h4 class="font-semibold text-blue-800 mb-2">Step 1: Data Validation & Preprocessing</h4>
                             <div class="text-sm text-blue-700 space-y-1">
-                                <p><strong>Input:</strong> Transaction data (description, amount, category, subcategory, counterparty)</p>
-                                <p><strong>Preprocessing:</strong> Convert all text to lowercase, extract key information</p>
-                                <p><strong>Validation:</strong> Check for required fields and data integrity</p>
+                                <p><strong>Input Validation:</strong> Validate transaction data against schema requirements</p>
+                                <p><strong>Data Cleaning:</strong> Normalize strings, ensure proper data types, generate missing IDs</p>
+                                <p><strong>Integrity Check:</strong> Verify no duplicate IDs, valid amounts, proper date formats</p>
+                                <p><strong>Error Recovery:</strong> Automatic repair of corrupted or invalid data</p>
                             </div>
                         </div>
 
                         <!-- Step 2 -->
                         <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
-                            <h4 class="font-semibold text-green-800 mb-2">Step 2: Priority 1 - Learned Rules (Highest Priority)</h4>
+                            <h4 class="font-semibold text-green-800 mb-2">Step 2: Unified Rule Application (Tier 1-5)</h4>
                             <div class="text-sm text-green-700 space-y-1">
-                                <p><strong>Learning System:</strong> Apply rules learned from manual tag assignments</p>
-                                <p><strong>Validation:</strong> Learned rules are validated against current classification logic</p>
-                                <p><strong>Result:</strong> If valid learned rule matches, apply with confidence and stop</p>
+                                <p><strong>Tier 1:</strong> Apply user-defined rules and critical mappings</p>
+                                <p><strong>Tier 2:</strong> Apply learned rules from manual assignments</p>
+                                <p><strong>Tier 3:</strong> Apply system rules and general patterns</p>
+                                <p><strong>Tier 4:</strong> Apply fallback rules and default assignments</p>
+                                <p><strong>Tier 5:</strong> Apply default classification as last resort</p>
+                                <p><strong>Rule Types:</strong> Category Mapping, Keyword Mapping, Category-Keyword Mapping, Category Assignment, Exclusion Rules</p>
                             </div>
                         </div>
 
                         <!-- Step 3 -->
                         <div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-400">
-                            <h4 class="font-semibold text-purple-800 mb-2">Step 3: Priority 2 - Category/Subcategory → Tag Mappings</h4>
+                            <h4 class="font-semibold text-purple-800 mb-2">Step 3: Enhanced Error Handling & Recovery</h4>
                             <div class="text-sm text-purple-700 space-y-1">
-                                <p><strong>Check:</strong> Look for custom mapping: category + subcategory → tag</p>
-                                <p><strong>Example:</strong> category="other", subcategory="credit card" → tag="Other"</p>
-                                <p><strong>Example:</strong> category="other", subcategory="charity" → tag="Gift"</p>
-                                <p><strong>Result:</strong> If mapping found, apply with 0.9 confidence and stop</p>
+                                <p><strong>Retry Logic:</strong> Exponential backoff retry for failed operations</p>
+                                <p><strong>Graceful Degradation:</strong> Safe fallbacks when operations fail</p>
+                                <p><strong>Error Logging:</strong> Comprehensive error tracking with severity levels</p>
+                                <p><strong>Recovery Strategies:</strong> Automatic recovery from storage and classification errors</p>
+                                <p><strong>Error Boundaries:</strong> Component-level error handling to prevent crashes</p>
                             </div>
                         </div>
 
                         <!-- Step 4 -->
                         <div class="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-400">
-                            <h4 class="font-semibold text-orange-800 mb-2">Step 4: Priority 3 - Existing Tag Validation</h4>
+                            <h4 class="font-semibold text-orange-800 mb-2">Step 4: Data Integrity & Validation</h4>
                             <div class="text-sm text-orange-700 space-y-1">
-                                <p><strong>Check:</strong> If transaction already has a tag, validate it against current rules</p>
-                                <p><strong>Investment Validation:</strong> If tag="Investments", run strict validation:</p>
-                                <ul class="ml-4 mt-1 space-y-1">
-                                    <li>• Must pass investment detection logic</li>
-                                    <li>• Category must be valid (investment, financial, etc.)</li>
-                                    <li>• Subcategory must be valid (stock purchase, etf, etc.)</li>
-                                    <li>• Must NOT contain excluded keywords (bunq, revolut, etc.)</li>
-                                </ul>
-                                <p><strong>Result:</strong> If validation fails, tag is invalidated and process continues</p>
+                                <p><strong>Schema Validation:</strong> Validate all data against defined schemas</p>
+                                <p><strong>Integrity Checks:</strong> Detect duplicates, invalid amounts, missing fields</p>
+                                <p><strong>Data Migration:</strong> Automatic migration between data versions</p>
+                                <p><strong>Repair Mechanisms:</strong> Automatic repair of corrupted data</p>
+                                <p><strong>Version Control:</strong> Track data versions and migration history</p>
                             </div>
                         </div>
 
                         <!-- Step 5 -->
                         <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-400">
-                            <h4 class="font-semibold text-red-800 mb-2">Step 5: Priority 4 - Keyword-Based Tag Assignment</h4>
+                            <h4 class="font-semibold text-red-800 mb-2">Step 5: Performance Optimization</h4>
                             <div class="text-sm text-red-700 space-y-1">
-                                <p><strong>Check:</strong> Apply hardcoded category rules based on description/keywords</p>
-                                <p><strong>Examples:</strong></p>
-                                <ul class="ml-4 mt-1 space-y-1">
-                                    <li>• "groceries" → category="groceries"</li>
-                                    <li>• "transport" → category="transport"</li>
-                                    <li>• "dining" → category="dining"</li>
-                                    <li>• "investment purchase" → category="investment"</li>
-                                </ul>
+                                <p><strong>Batch Processing:</strong> Process large datasets in configurable batches</p>
+                                <p><strong>Memoization:</strong> Cache expensive operations for better performance</p>
+                                <p><strong>Debouncing:</strong> Optimize frequent operations with debouncing</p>
+                                <p><strong>Safe Operations:</strong> Safe JSON parsing, localStorage operations with fallbacks</p>
+                                <p><strong>Error Recovery:</strong> Quick recovery from performance-related errors</p>
                             </div>
                         </div>
 
                         <!-- Step 6 -->
                         <div class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-400">
-                            <h4 class="font-semibold text-indigo-800 mb-2">Step 6: Priority 5 - Category Assignment & Default Tag</h4>
+                            <h4 class="font-semibold text-indigo-800 mb-2">Step 6: Final Classification & Metadata</h4>
                             <div class="text-sm text-indigo-700 space-y-1">
-                                <p><strong>Investment Detection:</strong> Check for investment indicators:</p>
-                                <ul class="ml-4 mt-1 space-y-1">
-                                    <li>• Keywords: "degiro", "flatex", "stock purchase", "etf"</li>
-                                    <li>• Account patterns: /degiro/i, /flatex/i</li>
-                                    <li>• Must be negative amount (outgoing)</li>
-                                    <li>• Must be above €10 threshold</li>
-                                    <li>• Must NOT contain fee/withdrawal keywords</li>
-                                </ul>
-                                <p><strong>Savings Detection:</strong> Check for savings indicators:</p>
-                                <ul class="ml-4 mt-1 space-y-1">
-                                    <li>• Keywords: "savings", "bunq", "emergency fund"</li>
-                                    <li>• Account patterns: /bunq/i, /savings account/i</li>
-                                </ul>
-                                <p><strong>Transfer Detection:</strong> Check for transfer indicators:</p>
-                                <ul class="ml-4 mt-1 space-y-1">
-                                    <li>• Keywords: "transfer", "between accounts"</li>
-                                    <li>• Account patterns: /internal transfer/i</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <!-- Step 7 -->
-                        <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-gray-400">
-                            <h4 class="font-semibold text-gray-800 mb-2">Step 7: Final Assignment & Auto-Classification</h4>
-                            <div class="text-sm text-gray-700 space-y-1">
-                                <p><strong>Default:</strong> If no specific tag assigned → "Other"</p>
-                                <p><strong>Confidence Levels:</strong></p>
-                                <ul class="ml-4 mt-1 space-y-1">
-                                    <li>• Special Rules: 1.0 (100% confidence)</li>
-                                    <li>• User Mappings: 0.9 (90% confidence)</li>
-                                    <li>• Investment Detection: 0.8 (80% confidence)</li>
-                                    <li>• Savings/Transfer Detection: 0.7 (70% confidence)</li>
-                                    <li>• Default: 0.5 (50% confidence)</li>
-                                </ul>
-                                <p><strong>Metadata:</strong> Store classification reason and confidence for transparency</p>
-                                <p><strong>Auto-Classification:</strong> After file upload, comprehensive classification is automatically applied to all transactions</p>
+                                <p><strong>Confidence Scoring:</strong> Dynamic confidence based on rule tier and match quality</p>
+                                <p><strong>Reason Tracking:</strong> Detailed explanation of classification decisions</p>
+                                <p><strong>Usage Statistics:</strong> Track rule usage for optimization</p>
+                                <p><strong>Metadata Storage:</strong> Store classification metadata for transparency</p>
+                                <p><strong>Auto-Classification:</strong> Comprehensive classification automatically applied after file upload</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">🔧 Management Tools</h3>
+                    <h3 class="text-lg font-semibold mb-2">🔧 Enhanced Management Tools</h3>
                     <div class="space-y-3">
                         <div class="bg-blue-50 p-3 rounded">
-                            <h4 class="font-medium text-blue-800">Manage Tag Mappings</h4>
-                            <p class="text-sm text-blue-700">Create custom category/subcategory → tag rules with visual interface</p>
+                            <h4 class="font-medium text-blue-800">Unified Rule Management</h4>
+                            <p class="text-sm text-blue-700">Create, edit, and manage classification rules with visual interface. Support for all rule types with tier-based priority system.</p>
                         </div>
                         <div class="bg-red-50 p-3 rounded">
-                            <h4 class="font-medium text-red-800">Fix All Existing Tags</h4>
-                            <p class="text-sm text-red-700">Re-evaluate all transactions using current rules and fix incorrect classifications</p>
+                            <h4 class="font-medium text-red-800">Comprehensive Tag Fixing</h4>
+                            <p class="text-sm text-red-700">Re-evaluate all transactions using latest unified rules with enhanced validation and error recovery</p>
                         </div>
                         <div class="bg-purple-50 p-3 rounded">
-                            <h4 class="font-medium text-purple-800">Extract & Merge All Rules</h4>
-                            <p class="text-sm text-purple-700">Combine hardcoded rules with custom mappings for comprehensive classification</p>
+                            <h4 class="font-medium text-purple-800">Data Validation & Integrity</h4>
+                            <p class="text-sm text-purple-700">Comprehensive data validation, integrity checks, and automatic repair of corrupted data</p>
                         </div>
                         <div class="bg-green-50 p-3 rounded">
-                            <h4 class="font-medium text-green-800">Auto-Classification</h4>
-                            <p class="text-sm text-green-700">Comprehensive classification automatically applied after file upload</p>
+                            <h4 class="font-medium text-green-800">Error Handling & Recovery</h4>
+                            <p class="text-sm text-green-700">Robust error handling with retry logic, graceful degradation, and automatic recovery strategies</p>
+                        </div>
+                        <div class="bg-orange-50 p-3 rounded">
+                            <h4 class="font-medium text-orange-800">Performance Optimization</h4>
+                            <p class="text-sm text-orange-700">Batch processing, memoization, debouncing, and safe operations for optimal performance</p>
+                        </div>
+                        <div class="bg-indigo-50 p-3 rounded">
+                            <h4 class="font-medium text-indigo-800">Auto-Classification</h4>
+                            <p class="text-sm text-indigo-700">Enhanced comprehensive classification automatically applied after file upload with validation</p>
                         </div>
                     </div>
                 </div>
@@ -2390,8 +2366,12 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">📊 Advanced Features</h3>
+                    <h3 class="text-lg font-semibold mb-2">📊 Advanced Features & Improvements</h3>
                     <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+                        <li><strong>Unified Rule System:</strong> Comprehensive classification with 5-tier priority structure and multiple rule types</li>
+                        <li><strong>Enhanced Error Handling:</strong> Robust error recovery, retry logic, and graceful degradation</li>
+                        <li><strong>Data Validation & Integrity:</strong> Comprehensive validation, integrity checks, and automatic data repair</li>
+                        <li><strong>Performance Optimization:</strong> Batch processing, memoization, debouncing, and safe operations</li>
                         <li><strong>Period Analysis:</strong> View transactions by month, quarter, year, or custom periods</li>
                         <li><strong>Savings Dashboard:</strong> Dedicated view for savings and investment tracking</li>
                         <li><strong>Transaction Filtering:</strong> Filter by income, expenses, savings, investments, or transfers</li>
@@ -2399,42 +2379,96 @@ watch([searchTerm, startDate, endDate, selectedPeriod], () => {
                         <li><strong>Manual Override:</strong> Manually tag individual transactions with override history</li>
                         <li><strong>Learning System:</strong> Learn from manual assignments and apply learned rules</li>
                         <li><strong>Statistics Export:</strong> Export period reports and transaction data</li>
+                        <li><strong>Code Organization:</strong> Modular architecture with clear separation of concerns and comprehensive documentation</li>
                     </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">🔄 Duplicate Detection & Data Integrity</h3>
-                    <p class="text-sm text-gray-600 mb-3">Robust duplicate detection and data management:</p>
+                    <h3 class="text-lg font-semibold mb-2">🔄 Enhanced Data Management & Integrity</h3>
+                    <p class="text-sm text-gray-600 mb-3">Comprehensive data management with advanced integrity and validation:</p>
                     <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                        <li>Uses transaction ID for JSON files</li>
-                        <li>Creates fingerprints from date, amount, and description for CSV files</li>
-                        <li>Duplicates are automatically filtered out during upload</li>
-                        <li>JSON-first approach with CSV enrichment</li>
-                        <li>Automatic backup creation before major operations</li>
-                        <li>Data recovery tools for localStorage issues</li>
+                        <li><strong>Duplicate Detection:</strong> Uses transaction ID for JSON files, creates fingerprints for CSV files</li>
+                        <li><strong>Data Validation:</strong> Comprehensive schema validation for transactions and rules</li>
+                        <li><strong>Integrity Checks:</strong> Automatic detection of duplicates, invalid amounts, missing fields, and date consistency</li>
+                        <li><strong>Data Cleaning:</strong> Automatic normalization and sanitization of transaction data</li>
+                        <li><strong>Version Migration:</strong> Automatic migration between data versions with validation</li>
+                        <li><strong>Error Recovery:</strong> Automatic repair of corrupted data and recovery strategies</li>
+                        <li><strong>JSON-first Approach:</strong> Primary data storage with CSV enrichment</li>
+                        <li><strong>Safe Storage:</strong> Enhanced localStorage operations with error handling and fallbacks</li>
+                        <li><strong>Backup & Restore:</strong> Automatic backup creation and comprehensive data portability</li>
                     </ul>
                 </div>
 
                 <div>
-                    <h3 class="text-lg font-semibold mb-2">🎯 Smart Classification Examples</h3>
+                    <h3 class="text-lg font-semibold mb-2">🎯 Enhanced Classification Examples</h3>
                     <div class="space-y-2">
-                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Bunq transactions:</strong> Automatically classified as Savings (not Investments)</div>
-                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Revolut transactions:</strong> Automatically classified as Transfers</div>
-                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Credit card payments:</strong> Can be mapped to "Other" via custom rules</div>
-                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Charity donations:</strong> Can be mapped to "Gift" via custom rules</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Bunq transactions:</strong> Automatically classified as Savings with exclusion rules preventing Investment misclassification</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Revolut transactions:</strong> Automatically classified as Transfers with high confidence</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Investment transactions:</strong> Strict validation with amount thresholds, keyword matching, and exclusion checks</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Credit card payments:</strong> Can be mapped to "Other" via unified rule system</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Charity donations:</strong> Can be mapped to "Gift" via unified rule system with confidence scoring</div>
+                        <div class="bg-gray-50 p-2 rounded text-sm"><strong>Data validation:</strong> All transactions validated against schemas with automatic error recovery</div>
                     </div>
                 </div>
 
                 <div>
                     <h3 class="text-lg font-semibold mb-2">📈 Analytics & Reporting</h3>
                     <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
-                        <li>Real-time income/expense statistics</li>
-                        <li>Savings rate calculation</li>
-                        <li>Investment tracking and analysis</li>
-                        <li>Period-over-period comparisons</li>
-                        <li>Tag-based transaction grouping</li>
-                        <li>Export capabilities for external analysis</li>
+                        <li>Real-time income/expense statistics with enhanced accuracy</li>
+                        <li>Savings rate calculation with validated data</li>
+                        <li>Investment tracking and analysis with strict validation</li>
+                        <li>Period-over-period comparisons with data integrity</li>
+                        <li>Tag-based transaction grouping with confidence scoring</li>
+                        <li>Export capabilities for external analysis with comprehensive metadata</li>
+                        <li>Error tracking and performance monitoring</li>
+                        <li>Rule usage statistics and optimization insights</li>
                     </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">⚙️ Technical Improvements & Architecture</h3>
+                    <div class="space-y-3">
+                        <div class="bg-blue-50 p-3 rounded">
+                            <h4 class="font-medium text-blue-800">Error Handling & Recovery</h4>
+                            <ul class="text-sm text-blue-700 list-disc list-inside space-y-1">
+                                <li>Comprehensive error logging with severity levels and context</li>
+                                <li>Exponential backoff retry mechanism for failed operations</li>
+                                <li>Graceful degradation with safe fallbacks</li>
+                                <li>Automatic recovery from storage and classification errors</li>
+                                <li>Error boundaries for component-level error handling</li>
+                            </ul>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded">
+                            <h4 class="font-medium text-green-800">Data Validation & Integrity</h4>
+                            <ul class="text-sm text-green-700 list-disc list-inside space-y-1">
+                                <li>Schema-based validation for transactions and rules</li>
+                                <li>Comprehensive integrity checks for data quality</li>
+                                <li>Automatic data cleaning and normalization</li>
+                                <li>Version migration with validation</li>
+                                <li>Enhanced storage with metadata tracking</li>
+                            </ul>
+                        </div>
+                        <div class="bg-purple-50 p-3 rounded">
+                            <h4 class="font-medium text-purple-800">Performance Optimization</h4>
+                            <ul class="text-sm text-purple-700 list-disc list-inside space-y-1">
+                                <li>Batch processing for large datasets</li>
+                                <li>Memoization for expensive operations</li>
+                                <li>Debouncing for frequent operations</li>
+                                <li>Safe operations with error handling</li>
+                                <li>Configurable performance settings</li>
+                            </ul>
+                        </div>
+                        <div class="bg-orange-50 p-3 rounded">
+                            <h4 class="font-medium text-orange-800">Code Organization</h4>
+                            <ul class="text-sm text-orange-700 list-disc list-inside space-y-1">
+                                <li>Modular architecture with clear separation of concerns</li>
+                                <li>Centralized configuration management</li>
+                                <li>Comprehensive utility functions</li>
+                                <li>Enhanced classification and storage engines</li>
+                                <li>Extensive documentation and code comments</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
             <template #footer>
