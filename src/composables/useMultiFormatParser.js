@@ -298,7 +298,7 @@ export function useMultiFormatParser() {
                 console.log(`🔍 Detected category for "${transaction.description}":`, detected);
             }
 
-            // Determine tag with proper priority handling
+            // Determine tag based on category/subcategory existingTag and description with proper priority handling
             transaction.tag = determineTag(transaction.category, transaction.subcategory, existingTag, transaction.description);
 
             console.log(`🏷️ Final tag assignment for "${transaction.description}":`, {

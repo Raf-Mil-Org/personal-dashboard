@@ -701,61 +701,61 @@ export function useTransactionEngine() {
     /**
      * Apply tags to all transactions with proper re-evaluation of existing tags
      */
-    const applyTagsToTransactions = (transactionList) => {
-        return transactionList.map((transaction) => {
-            const classification = classifyTransaction(transaction);
+    // const applyTagsToTransactions = (transactionList) => {
+    //     return transactionList.map((transaction) => {
+    //         const classification = classifyTransaction(transaction);
 
-            // Ensure every transaction has a proper classification
-            const finalClassification = {
-                tag: classification.tag || 'Other',
-                category: classification.category || 'Other',
-                subcategory: classification.subcategory || 'other',
-                confidence: classification.confidence || 0.5,
-                reason: classification.reason || 'No specific indicators detected - classified as Other'
-            };
+    //         // Ensure every transaction has a proper classification
+    //         const finalClassification = {
+    //             tag: classification.tag || 'Other',
+    //             category: classification.category || 'Other',
+    //             subcategory: classification.subcategory || 'other',
+    //             confidence: classification.confidence || 0.5,
+    //             reason: classification.reason || 'No specific indicators detected - classified as Other'
+    //         };
 
-            // Log if a transaction is being classified as 'Other' for debugging
-            if (finalClassification.tag === 'Other') {
-                console.log(`🏷️ Transaction classified as Other: "${transaction.description}" - Reason: ${finalClassification.reason}`);
-            }
+    //         // Log if a transaction is being classified as 'Other' for debugging
+    //         if (finalClassification.tag === 'Other') {
+    //             console.log(`🏷️ Transaction classified as Other: "${transaction.description}" - Reason: ${finalClassification.reason}`);
+    //         }
 
-            return {
-                ...transaction,
-                ...finalClassification
-            };
-        });
-    };
+    //         return {
+    //             ...transaction,
+    //             ...finalClassification
+    //         };
+    //     });
+    // };
 
     /**
      * Update a single transaction's tag and learn from it
      */
-    const updateTransactionTag = (transactionId, newTag, reason = 'Manual update') => {
-        const transaction = transactions.value.find((t) => t.id === transactionId);
-        if (!transaction) {
-            console.warn(`Transaction ${transactionId} not found`);
-            return false;
-        }
+    // const updateTransactionTag = (transactionId, newTag, reason = 'Manual update') => {
+    //     const transaction = transactions.value.find((t) => t.id === transactionId);
+    //     if (!transaction) {
+    //         console.warn(`Transaction ${transactionId} not found`);
+    //         return false;
+    //     }
 
-        const oldTag = transaction.tag;
-        transaction.tag = newTag;
+    //     const oldTag = transaction.tag;
+    //     transaction.tag = newTag;
 
-        // Learn from this assignment
-        learnFromAssignment(transaction, newTag);
+    //     // Learn from this assignment
+    //     learnFromAssignment(transaction, newTag);
 
-        // Add to override history
-        if (!transaction.overrideHistory) {
-            transaction.overrideHistory = [];
-        }
-        transaction.overrideHistory.push({
-            timestamp: new Date().toISOString(),
-            oldTag,
-            newTag,
-            reason
-        });
+    //     // Add to override history
+    //     if (!transaction.overrideHistory) {
+    //         transaction.overrideHistory = [];
+    //     }
+    //     transaction.overrideHistory.push({
+    //         timestamp: new Date().toISOString(),
+    //         oldTag,
+    //         newTag,
+    //         reason
+    //     });
 
-        console.log(`🏷️ Updated transaction ${transactionId}: ${oldTag} → ${newTag} (${reason})`);
-        return true;
-    };
+    //     console.log(`🏷️ Updated transaction ${transactionId}: ${oldTag} → ${newTag} (${reason})`);
+    //     return true;
+    // };
 
     // ============================================================================
     // DATA FIXING SECTION
@@ -1202,8 +1202,8 @@ export function useTransactionEngine() {
 
         // Classification
         classifyTransaction,
-        applyTagsToTransactions,
-        updateTransactionTag,
+        // applyTagsToTransactions,
+        // updateTransactionTag,
 
         // Data fixing
         fixAllTagAssignments,
